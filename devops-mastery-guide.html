@@ -513,11 +513,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
     <a href="#errors" class="toc-link">Common Errors</a>
   </div>
   <div class="toc-section">
-    <div class="toc-section-title">AWS Setup Guides</div>
-    <a href="#setup1" class="toc-link">Setup 1 — 2-Tier LEMP + ALB</a>
-    <a href="#setup2" class="toc-link">Setup 2 — Multi-Tier + Bastion</a>
-    <a href="#setup3" class="toc-link">Setup 3 — Cloudflare + Terraform + ALB</a>
-    <a href="#setup4" class="toc-link">Setup 4 — K8s Production Project</a>
+    <div class="toc-section-title">Projects (4–7)</div>
+    <a href="#setup1" class="toc-link">Project 4 — 2-Tier LEMP + ALB</a>
+    <a href="#setup2" class="toc-link">Project 5 — Multi-Tier + Bastion</a>
+    <a href="#setup3" class="toc-link">Project 6 — Cloudflare + Terraform + ALB</a>
+    <a href="#setup4" class="toc-link">Project 7 — K8s Production Project</a>
   </div>
   <div class="toc-section">
     <div class="toc-section-title">Advanced Topics</div>
@@ -533,12 +533,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
     <a href="#otel" class="toc-link">V. OpenTelemetry</a>
   </div>
   <div class="toc-section">
-    <div class="toc-section-title">More Projects</div>
-    <a href="#project-serverless" class="toc-link">Project 5 — Serverless API</a>
-    <a href="#project-devsecops-pipeline" class="toc-link">Project 6 — DevSecOps Pipeline</a>
-    <a href="#project-wordpress-ha" class="toc-link">Project 7 — WordPress HA</a>
-    <a href="#project-ecs-microservices" class="toc-link">Project 8 — ECS Microservices</a>
-    <a href="#project-istio-mesh" class="toc-link">Project 9 — Istio Mesh</a>
+    <div class="toc-section-title">Projects (8–12)</div>
+    <a href="#project-serverless" class="toc-link">Project 8 — Serverless API</a>
+    <a href="#project-devsecops-pipeline" class="toc-link">Project 9 — DevSecOps Pipeline</a>
+    <a href="#project-wordpress-ha" class="toc-link">Project 10 — WordPress HA</a>
+    <a href="#project-ecs-microservices" class="toc-link">Project 11 — ECS Microservices</a>
+    <a href="#project-istio-mesh" class="toc-link">Project 12 — Istio Mesh</a>
   </div>
   <div class="toc-section">
     <div class="toc-section-title">Cheat Sheets</div>
@@ -3915,7 +3915,7 @@ aws sts get-caller-identity</code></pre>
 <div class="section" id="setup1">
   <div class="section-header">
     <div class="section-icon" style="background:rgba(245,158,11,0.15);">⚙️</div>
-    <h2>Setup 1 — 2-Tier Production LEMP Stack on AWS with ALB</h2>
+    <h2>Project 4 — 2-Tier Production LEMP Stack on AWS with ALB</h2>
     <span class="level-tag badge-blue badge">Intermediate</span>
   </div>
 
@@ -4377,7 +4377,7 @@ aws ec2 wait instance-terminated --instance-ids $APP_INSTANCE $DB_INSTANCE
 <div class="section" id="setup2">
   <div class="section-header">
     <div class="section-icon" style="background:rgba(124,58,237,0.15);">🏛️</div>
-    <h2>Setup 2 — Full Production Multi-Tier AWS Architecture with Bastion</h2>
+    <h2>Project 5 — Full Production Multi-Tier AWS Architecture with Bastion</h2>
     <span class="level-tag badge-purple badge">Advanced</span>
   </div>
 
@@ -4962,7 +4962,7 @@ aws route53 change-resource-record-sets \
 <div class="section" id="setup3">
   <div class="section-header">
     <div class="section-icon" style="background:rgba(249,115,22,0.15);">☁️</div>
-    <h2>Setup 3 — Cloudflare CDN + WAF + Terraform-managed AWS ALB</h2>
+    <h2>Project 6 — Cloudflare CDN + WAF + Terraform-managed AWS ALB</h2>
     <span class="level-tag badge-purple badge">Advanced</span>
   </div>
 
@@ -5758,7 +5758,7 @@ aws autoscaling describe-auto-scaling-groups \
 <div class="section" id="setup4">
   <div class="section-header">
     <div class="section-icon" style="background:rgba(124,58,237,0.15);">☸️</div>
-    <h2>Setup 4 — Production Kubernetes Project: Full-Stack App with GitOps, Monitoring &amp; Security</h2>
+    <h2>Project 7 — Production Kubernetes: Full-Stack App with GitOps, Monitoring &amp; Security</h2>
     <span class="level-tag badge-purple badge">Advanced / Senior</span>
   </div>
 
@@ -9025,7 +9025,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 
 <!-- ==================== PROJECT 5: SERVERLESS API ==================== -->
 <section id="project-serverless" class="section">
-  <h2>Project 5: Serverless REST API — Lambda + API Gateway + DynamoDB + Terraform</h2>
+  <h2>Project 8: Serverless REST API — Lambda + API Gateway + DynamoDB + Terraform</h2>
 
   <div class="diagram-box">
     <strong>Architecture</strong><br>
@@ -9354,7 +9354,7 @@ jobs:
 
 <!-- ==================== PROJECT 6: FULL DEVSECOPS PIPELINE ==================== -->
 <section id="project-devsecops-pipeline" class="section">
-  <h2>Project 6: Full DevSecOps Pipeline — Jenkins + SonarQube + Trivy + ArgoCD + Kubernetes</h2>
+  <h2>Project 9: Full DevSecOps Pipeline — Jenkins + SonarQube + Trivy + ArgoCD + Kubernetes</h2>
 
   <div class="diagram-box">
     <strong>Pipeline Flow</strong><br>
@@ -9612,7 +9612,7 @@ volumes:
 
 <!-- ==================== PROJECT 7: WORDPRESS HA ==================== -->
 <section id="project-wordpress-ha" class="section">
-  <h2>Project 7: WordPress HA — EC2 ASG + RDS + EFS + CloudFront + WAF</h2>
+  <h2>Project 10: WordPress HA — EC2 ASG + RDS + EFS + CloudFront + WAF</h2>
 
   <div class="diagram-box">
     <strong>Architecture</strong><br>
@@ -9866,7 +9866,7 @@ systemctl enable --now amazon-ssm-agent</code></pre>
 
 <!-- ==================== PROJECT 8: ECS FARGATE MICROSERVICES ==================== -->
 <section id="project-ecs-microservices" class="section">
-  <h2>Project 8: ECS Fargate Microservices + Terraform + GitHub Actions</h2>
+  <h2>Project 11: ECS Fargate Microservices + Terraform + GitHub Actions</h2>
 
   <div class="diagram-box">
     <strong>Architecture</strong><br>
@@ -10108,7 +10108,7 @@ jobs:
 
 <!-- ==================== PROJECT 9: ISTIO SERVICE MESH ==================== -->
 <section id="project-istio-mesh" class="section">
-  <h2>Project 9: Production Istio Service Mesh on EKS — Full Observability + mTLS + Canary</h2>
+  <h2>Project 12: Production Istio Service Mesh on EKS — Full Observability + mTLS + Canary</h2>
 
   <div class="diagram-box">
     <strong>Stack</strong><br>
