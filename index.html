@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevOps Mastery Guide — Choose Your Path</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --text:#f0f6fc;--text2:#c9d1d9;--text3:#8b949e;--text4:#6e7681;
+  --accent:#58a6ff;--green:#3fb950;--purple:#bc8cff;--orange:#f0883e;--red:#f85149;
+  --fresher-start:#3fb950;--fresher-end:#1a7f37;
+  --mid-start:#58a6ff;--mid-end:#1f6feb;
+  --senior-start:#bc8cff;--senior-end:#8957e5;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text2);min-height:100vh;overflow-x:hidden}
+
+/* ─── NAV ─── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 2rem;height:60px;
+  background:rgba(13,17,23,.85);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.1rem;color:var(--text);text-decoration:none}
+.nav-logo .logo-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff}
+.nav-links{display:flex;align-items:center;gap:.4rem}
+.nav-links a{
+  padding:.4rem .9rem;border-radius:6px;font-size:.85rem;font-weight:500;
+  text-decoration:none;color:var(--text3);transition:all .2s;border:1px solid transparent;
+}
+.nav-links a:hover{color:var(--text);background:var(--surface2);border-color:var(--border)}
+.nav-links .nav-full{color:var(--accent);border-color:var(--accent)}
+.nav-links .nav-full:hover{background:rgba(88,166,255,.1)}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.4rem;cursor:pointer}
+
+/* ─── HERO ─── */
+.hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:80px 2rem 4rem;text-align:center;position:relative;overflow:hidden;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(88,166,255,.08) 0%,transparent 60%),
+             radial-gradient(ellipse 60% 40% at 80% 80%,rgba(188,140,255,.06) 0%,transparent 50%),
+             radial-gradient(ellipse 50% 40% at 10% 70%,rgba(63,185,80,.05) 0%,transparent 50%);
+}
+.grid-bg{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:40px 40px;
+  mask-image:radial-gradient(ellipse 100% 100% at 50% 50%,black 30%,transparent 80%);
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.4rem 1rem;border-radius:20px;
+  background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.3);
+  color:var(--accent);font-size:.8rem;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;margin-bottom:1.5rem;
+  animation:fadeInDown .6s ease;
+}
+.hero h1{
+  font-size:clamp(2.4rem,6vw,4rem);font-weight:800;color:var(--text);
+  line-height:1.1;margin-bottom:1.2rem;
+  animation:fadeInDown .7s ease .1s both;
+}
+.hero h1 span{
+  background:linear-gradient(135deg,var(--accent) 0%,var(--purple) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero p{
+  font-size:1.15rem;color:var(--text3);max-width:580px;line-height:1.7;
+  margin-bottom:2.5rem;animation:fadeInDown .8s ease .2s both;
+}
+.hero-stats{
+  display:flex;gap:2rem;flex-wrap:wrap;justify-content:center;
+  margin-bottom:3rem;animation:fadeInDown .9s ease .3s both;
+}
+.stat{text-align:center}
+.stat-num{font-size:1.6rem;font-weight:700;color:var(--text)}
+.stat-label{font-size:.75rem;color:var(--text4);text-transform:uppercase;letter-spacing:.05em}
+
+/* ─── CHOOSE PATH ─── */
+.section-title{
+  text-align:center;margin-bottom:.8rem;
+  font-size:1.8rem;font-weight:700;color:var(--text);
+}
+.section-sub{text-align:center;color:var(--text3);margin-bottom:3rem;font-size:1rem}
+.paths{padding:5rem 2rem;max-width:1200px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;margin-bottom:3rem}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:2rem;position:relative;overflow:hidden;cursor:pointer;
+  transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease;
+  text-decoration:none;display:block;
+}
+.card:hover{transform:translateY(-4px)}
+.card::before{
+  content:'';position:absolute;inset:0;border-radius:16px;
+  opacity:0;transition:opacity .25s;
+  background:linear-gradient(135deg,rgba(255,255,255,.03),transparent);
+}
+.card:hover::before{opacity:1}
+.card-glow{
+  position:absolute;top:-40px;right:-40px;width:160px;height:160px;
+  border-radius:50%;filter:blur(50px);opacity:.15;transition:opacity .3s;
+}
+.card:hover .card-glow{opacity:.3}
+
+.card-fresher{border-color:rgba(63,185,80,.25)}
+.card-fresher:hover{border-color:var(--green);box-shadow:0 0 30px rgba(63,185,80,.1)}
+.card-fresher .card-glow{background:var(--green)}
+
+.card-mid{border-color:rgba(88,166,255,.25)}
+.card-mid:hover{border-color:var(--accent);box-shadow:0 0 30px rgba(88,166,255,.1)}
+.card-mid .card-glow{background:var(--accent)}
+
+.card-senior{border-color:rgba(188,140,255,.25)}
+.card-senior:hover{border-color:var(--purple);box-shadow:0 0 30px rgba(188,140,255,.1)}
+.card-senior .card-glow{background:var(--purple)}
+
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.2rem}
+.card-icon{
+  width:52px;height:52px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:1.6rem;flex-shrink:0;
+}
+.icon-fresher{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3)}
+.icon-mid{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3)}
+.icon-senior{background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.3)}
+
+.card-badge{
+  padding:.3rem .8rem;border-radius:20px;font-size:.72rem;
+  font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+}
+.badge-fresher{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.badge-mid{background:rgba(88,166,255,.15);color:var(--accent);border:1px solid rgba(88,166,255,.3)}
+.badge-senior{background:rgba(188,140,255,.15);color:var(--purple);border:1px solid rgba(188,140,255,.3)}
+
+.card h2{font-size:1.3rem;font-weight:700;color:var(--text);margin-bottom:.3rem}
+.card-exp{font-size:.8rem;color:var(--text4);margin-bottom:.8rem}
+.card-desc{font-size:.88rem;color:var(--text3);line-height:1.6;margin-bottom:1.2rem}
+
+.card-topics{list-style:none;margin-bottom:1.5rem;display:flex;flex-direction:column;gap:.4rem}
+.card-topics li{
+  display:flex;align-items:center;gap:.6rem;
+  font-size:.82rem;color:var(--text3);
+}
+.card-topics li::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.card-fresher .card-topics li::before{background:var(--green)}
+.card-mid .card-topics li::before{background:var(--accent)}
+.card-senior .card-topics li::before{background:var(--purple)}
+
+.card-meta{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.meta-item{
+  display:flex;align-items:center;gap:.35rem;
+  font-size:.78rem;color:var(--text4);
+  background:var(--surface2);padding:.3rem .7rem;border-radius:6px;
+}
+.card-cta{
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+  padding:.7rem 1.2rem;border-radius:8px;font-size:.88rem;font-weight:600;
+  transition:all .2s;border:none;cursor:pointer;width:100%;
+}
+.cta-fresher{background:linear-gradient(135deg,var(--fresher-start),var(--fresher-end));color:#fff}
+.cta-fresher:hover{box-shadow:0 4px 20px rgba(63,185,80,.3)}
+.cta-mid{background:linear-gradient(135deg,var(--mid-start),var(--mid-end));color:#fff}
+.cta-mid:hover{box-shadow:0 4px 20px rgba(88,166,255,.3)}
+.cta-senior{background:linear-gradient(135deg,var(--senior-start),var(--senior-end));color:#fff}
+.cta-senior:hover{box-shadow:0 4px 20px rgba(188,140,255,.3)}
+
+/* ─── FULL GUIDE BANNER ─── */
+.guide-banner{
+  margin:0 auto 4rem;max-width:900px;padding:0 2rem;
+}
+.guide-banner-inner{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;
+  padding:1.5rem 2rem;border-radius:12px;
+  background:var(--surface);border:1px solid var(--border);
+}
+.guide-banner h3{font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:.3rem}
+.guide-banner p{font-size:.85rem;color:var(--text3)}
+.guide-banner-btn{
+  padding:.7rem 1.5rem;border-radius:8px;font-size:.9rem;font-weight:600;
+  background:transparent;color:var(--accent);border:1px solid var(--accent);
+  cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap;
+}
+.guide-banner-btn:hover{background:rgba(88,166,255,.1)}
+
+/* ─── FEATURES ─── */
+.features{background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:4rem 2rem}
+.features-inner{max-width:1100px;margin:0 auto}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-top:2rem}
+.feature{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.6rem}
+.feature-icon{
+  width:48px;height:48px;border-radius:12px;
+  background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.2);
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+}
+.feature h4{font-size:.9rem;font-weight:600;color:var(--text)}
+.feature p{font-size:.8rem;color:var(--text3);line-height:1.5}
+
+/* ─── FOOTER ─── */
+footer{padding:2rem;text-align:center;color:var(--text4);font-size:.8rem;border-top:1px solid var(--border)}
+footer a{color:var(--accent);text-decoration:none}
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:768px){
+  nav{padding:0 1rem}
+  .nav-links{display:none}
+  .nav-links.open{display:flex;flex-direction:column;position:fixed;top:60px;left:0;right:0;background:var(--surface);padding:1rem;border-bottom:1px solid var(--border)}
+  .hamburger{display:block}
+  .hero h1{font-size:2rem}
+  .hero-stats{gap:1.2rem}
+  .stat-num{font-size:1.2rem}
+  .guide-banner-inner{flex-direction:column;text-align:center}
+}
+@media(max-width:480px){
+  .cards{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">⚙</div>
+    DevOps Mastery
+  </a>
+  <div class="nav-links" id="nav-links">
+    <a href="fresher.html" style="color:var(--green)">🌱 Fresher</a>
+    <a href="mid.html" style="color:var(--accent)">🚀 Mid Level</a>
+    <a href="senior.html" style="color:var(--purple)">⭐ Senior</a>
+    <a href="devops-mastery-guide.html" class="nav-full">📖 Full Guide</a>
+  </div>
+  <button class="hamburger" id="hamburger">☰</button>
+</nav>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="grid-bg"></div>
+  <div style="position:relative">
+    <div class="hero-badge">⚙ Complete DevOps Learning Platform</div>
+    <h1>Master <span>DevOps</span> at<br>Your Own Pace</h1>
+    <p>A comprehensive, level-adaptive guide covering Linux to Kubernetes, CI/CD to DevSecOps — built for freshers, mid-level engineers, and senior leads alike.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-num">60+</div><div class="stat-label">Topics</div></div>
+      <div class="stat"><div class="stat-num">12</div><div class="stat-label">Projects</div></div>
+      <div class="stat"><div class="stat-num">90+</div><div class="stat-label">Interview Q&As</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Experience Levels</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Cheat Sheets</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="paths" id="choose">
+  <h2 class="section-title">Choose Your Learning Path</h2>
+  <p class="section-sub">Select the path that matches your experience level for a curated, focused learning experience</p>
+
+  <div class="cards">
+    <!-- FRESHER CARD -->
+    <a href="fresher.html" class="card card-fresher">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-icon icon-fresher">🌱</div>
+        <span class="card-badge badge-fresher">Fresher</span>
+      </div>
+      <h2>Fresher / Junior</h2>
+      <div class="card-exp">0 – 1 Year Experience</div>
+      <p class="card-desc">Perfect for CS graduates, career switchers, and anyone new to DevOps. Start from the fundamentals and build a solid foundation.</p>
+      <ul class="card-topics">
+        <li>Linux fundamentals & shell scripting</li>
+        <li>Networking concepts (TCP/IP, DNS, HTTP)</li>
+        <li>Git & GitHub workflows</li>
+        <li>Docker containers basics</li>
+        <li>CI/CD pipeline introduction</li>
+        <li>3 hands-on beginner projects</li>
+      </ul>
+      <div class="card-meta">
+        <span class="meta-item">📚 5 Core Topics</span>
+        <span class="meta-item">🏗 3 Projects</span>
+        <span class="meta-item">⏱ 3–6 Months</span>
+      </div>
+      <button class="card-cta cta-fresher">Start Learning →</button>
+    </a>
+
+    <!-- MID CARD -->
+    <a href="mid.html" class="card card-mid">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-icon icon-mid">🚀</div>
+        <span class="card-badge badge-mid">Mid Level</span>
+      </div>
+      <h2>Mid Level Engineer</h2>
+      <div class="card-exp">2 – 5 Years Experience</div>
+      <p class="card-desc">For engineers ready to go deeper — advanced CI/CD, Kubernetes orchestration, cloud infrastructure, and IaC with Terraform.</p>
+      <ul class="card-topics">
+        <li>Advanced CI/CD with Jenkins & GitHub Actions</li>
+        <li>Docker advanced + Kubernetes orchestration</li>
+        <li>AWS Cloud services (EC2, S3, IAM, VPC)</li>
+        <li>Terraform infrastructure as code</li>
+        <li>Ansible configuration management</li>
+        <li>Prometheus + Grafana monitoring</li>
+      </ul>
+      <div class="card-meta">
+        <span class="meta-item">📚 8 Topics</span>
+        <span class="meta-item">🏗 5 Projects</span>
+        <span class="meta-item">⏱ 6–12 Months</span>
+      </div>
+      <button class="card-cta cta-mid">Start Learning →</button>
+    </a>
+
+    <!-- SENIOR CARD -->
+    <a href="senior.html" class="card card-senior">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-icon icon-senior">⭐</div>
+        <span class="card-badge badge-senior">Senior</span>
+      </div>
+      <h2>Senior / Lead Engineer</h2>
+      <div class="card-exp">5+ Years Experience</div>
+      <p class="card-desc">For senior engineers targeting lead and architect roles. Focus on DevSecOps, SRE practices, distributed systems, and production architecture.</p>
+      <ul class="card-topics">
+        <li>DevSecOps — secure CI/CD pipelines</li>
+        <li>Site Reliability Engineering (SRE)</li>
+        <li>Kubernetes advanced + Istio service mesh</li>
+        <li>System design for high availability</li>
+        <li>Serverless, ECS Fargate architecture</li>
+        <li>AWS cost optimization strategies</li>
+      </ul>
+      <div class="card-meta">
+        <span class="meta-item">📚 10 Topics</span>
+        <span class="meta-item">🏗 4 Projects</span>
+        <span class="meta-item">⏱ 12+ Months</span>
+      </div>
+      <button class="card-cta cta-senior">Start Learning →</button>
+    </a>
+  </div>
+
+  <div class="guide-banner">
+    <div class="guide-banner-inner">
+      <div>
+        <h3>📖 Prefer everything in one place?</h3>
+        <p>Access the complete guide with all 60+ topics, cheat sheets, and projects on a single page.</p>
+      </div>
+      <a href="devops-mastery-guide.html" class="guide-banner-btn">Open Full Guide →</a>
+    </div>
+  </div>
+</div>
+
+<section class="features">
+  <div class="features-inner">
+    <h2 class="section-title" style="margin-bottom:.5rem">Everything You Need to Succeed</h2>
+    <p class="section-sub">Each level page is packed with interactive features</p>
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-icon">🔍</div>
+        <h4>Topic Filters</h4>
+        <p>Filter sections by topic instantly to find what you need</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">✅</div>
+        <h4>Progress Tracking</h4>
+        <p>Check off topics as you learn — saved locally</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📋</div>
+        <h4>Copy Code Buttons</h4>
+        <p>One-click copy on every code block</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌙</div>
+        <h4>Dark / Light Mode</h4>
+        <p>Easy on the eyes, your preference saved</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📱</div>
+        <h4>Mobile Friendly</h4>
+        <p>Works perfectly on all screen sizes</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🎯</div>
+        <h4>Interview Q&A</h4>
+        <p>Level-specific interview questions and answers</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>Built with ❤ for the DevOps community · <a href="devops-mastery-guide.html">Full Guide</a> · <a href="fresher.html">Fresher</a> · <a href="mid.html">Mid Level</a> · <a href="senior.html">Senior</a></p>
+</footer>
+
+<script>
+document.getElementById('hamburger').addEventListener('click',()=>{
+  document.getElementById('nav-links').classList.toggle('open');
+});
+</script>
+</body>
+</html>

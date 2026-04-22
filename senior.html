@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Senior DevOps Guide — Lead / Architect Path</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --text:#f0f6fc;--text2:#c9d1d9;--text3:#8b949e;--text4:#6e7681;
+  --accent:#bc8cff;--accent2:#8957e5;--code-bg:#161b22;
+  --sidebar-w:280px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text2);font-size:15px;line-height:1.7}
+#progress-bar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),#f0883e);z-index:200;transition:width .1s}
+.topnav{position:fixed;top:3px;left:0;right:0;z-index:100;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;background:rgba(13,17,23,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.topnav-left{display:flex;align-items:center;gap:1rem}
+.level-badge{padding:.3rem .9rem;border-radius:20px;font-size:.78rem;font-weight:700;background:rgba(188,140,255,.15);color:var(--accent);border:1px solid rgba(188,140,255,.4);letter-spacing:.05em}
+.level-switch{display:flex;align-items:center;gap:.3rem}
+.level-switch a{padding:.3rem .7rem;border-radius:6px;font-size:.78rem;font-weight:500;text-decoration:none;color:var(--text4);transition:all .2s}
+.level-switch a:hover{color:var(--text);background:var(--surface2)}
+.level-switch a.active{color:var(--accent);background:rgba(188,140,255,.1)}
+.topnav-right{display:flex;align-items:center;gap:.6rem}
+.icon-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;transition:all .2s}
+.icon-btn:hover{color:var(--text);border-color:var(--text3)}
+.hamburger{display:none}
+.layout{display:flex;margin-top:57px;min-height:calc(100vh - 57px)}
+.sidebar{width:var(--sidebar-w);flex-shrink:0;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sidebar-head{padding:1rem 1.2rem .8rem;border-bottom:1px solid var(--border)}
+.sidebar-search{width:100%;padding:.45rem .7rem;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.82rem;outline:none}
+.sidebar-search:focus{border-color:var(--accent)}
+.sidebar-search::placeholder{color:var(--text4)}
+.toc{padding:.8rem 0;flex:1}
+.toc-group{padding:0 .8rem .5rem}
+.toc-group-title{font-size:.68rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.1em;padding:.4rem .5rem;margin-bottom:.2rem}
+.toc a{display:flex;align-items:center;gap:.6rem;padding:.38rem .5rem;border-radius:6px;font-size:.82rem;color:var(--text3);text-decoration:none;transition:all .18s;border-left:2px solid transparent}
+.toc a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.toc a.active{color:var(--accent);background:rgba(188,140,255,.08);border-left-color:var(--accent)}
+.toc a.hidden{display:none}
+.toc-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;opacity:.5}
+.progress-info{padding:1rem 1.2rem;border-top:1px solid var(--border);font-size:.78rem;color:var(--text4)}
+.progress-bar-inner{margin-top:.5rem;height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90}
+main{flex:1;min-width:0;padding:2rem clamp(1rem,4vw,2.5rem)}
+.page-hero{padding:2rem;border-radius:16px;margin-bottom:2rem;background:linear-gradient(135deg,rgba(188,140,255,.08) 0%,rgba(188,140,255,.02) 100%);border:1px solid rgba(188,140,255,.2);display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+.page-hero-icon{font-size:2.5rem}
+.page-hero h1{font-size:1.6rem;font-weight:800;color:var(--text);margin-bottom:.3rem}
+.page-hero p{font-size:.9rem;color:var(--text3);max-width:500px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem}
+.hero-tag{padding:.25rem .7rem;border-radius:5px;font-size:.72rem;font-weight:600;background:rgba(188,140,255,.12);color:var(--accent);border:1px solid rgba(188,140,255,.25)}
+.filter-bar{display:flex;flex-wrap:wrap;gap:.5rem;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:2rem;align-items:center}
+.filter-label{font-size:.78rem;color:var(--text4);font-weight:600;margin-right:.3rem}
+.filter-btn{padding:.35rem .8rem;border-radius:6px;font-size:.78rem;font-weight:500;background:var(--surface2);color:var(--text3);border:1px solid var(--border);cursor:pointer;transition:all .18s}
+.filter-btn:hover{color:var(--text);border-color:var(--text3)}
+.filter-btn.active{color:var(--accent);background:rgba(188,140,255,.1);border-color:rgba(188,140,255,.4)}
+.section{margin-bottom:2.5rem;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface)}
+.section.hidden{display:none}
+.section-header{padding:1.2rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;background:linear-gradient(135deg,rgba(255,255,255,.02),transparent)}
+.section-title-row{display:flex;align-items:center;gap:.8rem}
+.section-icon{font-size:1.2rem}
+.section h2{font-size:1.15rem;font-weight:700;color:var(--text)}
+.section-meta{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.tag{padding:.2rem .6rem;border-radius:5px;font-size:.7rem;font-weight:600;background:rgba(188,140,255,.12);color:var(--accent);border:1px solid rgba(188,140,255,.25)}
+.reading-time{font-size:.72rem;color:var(--text4)}
+.check-label{display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:var(--text4)}
+.check-label input{accent-color:var(--accent)}
+.section-body{padding:1.2rem 1.5rem}
+.section h3{font-size:1rem;font-weight:600;color:var(--text);margin:1.2rem 0 .6rem;padding-top:.4rem}
+.section h3:first-child{margin-top:0}
+p{margin-bottom:.8rem;color:var(--text3)}
+.pre-wrap{position:relative;margin:.8rem 0}
+.lang-label{position:absolute;top:8px;right:44px;z-index:1;font-size:.68rem;font-family:'JetBrains Mono',monospace;color:var(--text4);background:var(--surface2);padding:.1rem .4rem;border-radius:4px}
+.copy-btn{position:absolute;top:8px;right:8px;z-index:1;padding:.25rem .55rem;border-radius:5px;font-size:.7rem;font-weight:600;background:var(--surface2);color:var(--text3);border:1px solid var(--border);cursor:pointer;transition:all .18s}
+.copy-btn:hover{color:var(--text);border-color:var(--text3)}
+.copy-btn.copied{color:var(--accent);border-color:var(--accent)}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1rem;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;color:#e6edf3}
+code{font-family:'JetBrains Mono',monospace;font-size:.82em;color:#e6edf3;background:rgba(110,118,129,.15);padding:.1em .3em;border-radius:4px}
+pre code{background:none;padding:0;font-size:inherit}
+.pre-wrap pre{padding-top:2.2rem}
+table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.85rem}
+th{background:var(--surface2);color:var(--text);padding:.6rem .8rem;text-align:left;font-weight:600;border:1px solid var(--border)}
+td{padding:.55rem .8rem;border:1px solid var(--border);color:var(--text3)}
+tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.qa-list{display:flex;flex-direction:column;gap:.8rem;margin-top:.5rem}
+.qa{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .18s}
+.qa:hover{border-color:var(--accent)}
+.qa-q{padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;font-size:.88rem;font-weight:500;color:var(--text);background:var(--surface2);gap:.5rem}
+.qa-q .arrow{font-size:.7rem;color:var(--text4);transition:transform .2s;flex-shrink:0}
+.qa.open .qa-q .arrow{transform:rotate(180deg)}
+.qa-a{display:none;padding:.8rem 1rem;font-size:.85rem;color:var(--text3);border-top:1px solid var(--border);line-height:1.6}
+.qa.open .qa-a{display:block}
+.project-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:.5rem}
+.project-card{border:1px solid var(--border);border-radius:10px;padding:1.2rem;background:var(--surface2);transition:border-color .2s,transform .2s}
+.project-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.project-num{font-size:.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem}
+.project-card h4{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:.4rem}
+.project-card p{font-size:.82rem;color:var(--text3);margin-bottom:.8rem}
+.project-tags{display:flex;flex-wrap:wrap;gap:.35rem}
+.project-tag{padding:.2rem .5rem;border-radius:4px;font-size:.7rem;background:rgba(188,140,255,.1);color:var(--accent);border:1px solid rgba(188,140,255,.2)}
+.diff-hard{background:rgba(188,140,255,.2);color:#bc8cff;display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.68rem;font-weight:700;margin-left:.5rem}
+.tip,.note,.warn,.danger{padding:.8rem 1rem;border-radius:8px;font-size:.85rem;margin:.8rem 0;display:flex;align-items:flex-start;gap:.6rem}
+.tip{background:rgba(63,185,80,.07);border-left:3px solid #3fb950;color:var(--text3)}
+.note{background:rgba(88,166,255,.07);border-left:3px solid #58a6ff;color:var(--text3)}
+.warn{background:rgba(240,136,62,.07);border-left:3px solid #f0883e;color:var(--text3)}
+.danger{background:rgba(248,81,73,.07);border-left:3px solid #f85149;color:var(--text3)}
+.diagram-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.7;color:#e6edf3;margin:.8rem 0;white-space:pre}
+.arch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:.8rem 0}
+.arch-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;text-align:center}
+.arch-card .arch-icon{font-size:1.5rem;margin-bottom:.4rem}
+.arch-card h4{font-size:.88rem;font-weight:600;color:var(--text);margin-bottom:.3rem}
+.arch-card p{font-size:.78rem;color:var(--text3);margin:0}
+.scroll-top{position:fixed;bottom:2rem;right:1.5rem;z-index:50;width:40px;height:40px;border-radius:10px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1rem;display:none;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(188,140,255,.3);transition:transform .2s}
+.scroll-top.show{display:flex}
+.scroll-top:hover{transform:translateY(-2px)}
+@media(max-width:900px){.sidebar{position:fixed;top:57px;bottom:0;left:-300px;z-index:95;width:var(--sidebar-w);transition:left .25s ease}.sidebar.open{left:0}.sidebar-overlay{display:block}.hamburger{display:flex!important}}
+@media(max-width:600px){main{padding:1rem}.page-hero{padding:1.2rem}.section-body{padding:.9rem 1rem}.section-header{padding:.9rem 1rem}.level-switch{display:none}}
+@media print{.topnav,.sidebar,.filter-bar,.scroll-top,.sidebar-overlay{display:none!important}.layout{margin-top:0}main{padding:0}.section{border:1px solid #ccc;break-inside:avoid}}
+</style>
+</head>
+<body>
+<div id="progress-bar"></div>
+<nav class="topnav">
+  <div class="topnav-left">
+    <button class="icon-btn hamburger" id="hamburger">☰</button>
+    <a href="index.html" style="text-decoration:none;color:var(--text3);font-size:.82rem">← Home</a>
+    <span class="level-badge">⭐ Senior / Lead · 5+ Years</span>
+    <div class="level-switch">
+      <a href="fresher.html">Fresher</a>
+      <a href="mid.html">Mid Level</a>
+      <a href="senior.html" class="active">Senior</a>
+      <a href="devops-mastery-guide.html" style="color:#3fb950">Full Guide</a>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <button class="icon-btn" id="theme-btn" title="Toggle theme">🌙</button>
+    <button class="icon-btn" onclick="window.print()" title="Print">🖨</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <input type="text" class="sidebar-search" id="search" placeholder="Search topics…" autocomplete="off">
+    </div>
+    <nav class="toc">
+      <div class="toc-group">
+        <div class="toc-group-title">Security & Reliability</div>
+        <a href="#devsecops"><span class="toc-dot"></span>A. DevSecOps</a>
+        <a href="#sre"><span class="toc-dot"></span>B. Site Reliability Engineering</a>
+        <a href="#sysdesign"><span class="toc-dot"></span>C. System Design</a>
+      </div>
+      <div class="toc-group">
+        <div class="toc-group-title">Advanced Cloud Native</div>
+        <a href="#k8s-advanced"><span class="toc-dot"></span>D. Kubernetes Advanced</a>
+        <a href="#istio"><span class="toc-dot"></span>E. Istio Service Mesh</a>
+        <a href="#serverless"><span class="toc-dot"></span>F. Serverless Architecture</a>
+        <a href="#cost"><span class="toc-dot"></span>G. Cost Optimization</a>
+      </div>
+      <div class="toc-group">
+        <div class="toc-group-title">Leadership</div>
+        <a href="#architecture"><span class="toc-dot"></span>H. Architecture Decisions</a>
+        <a href="#projects"><span class="toc-dot"></span>Projects (9–12)</a>
+        <a href="#interview"><span class="toc-dot"></span>Senior Interview Prep</a>
+      </div>
+    </nav>
+    <div class="progress-info">
+      <span id="progress-text">0 of 10 topics completed</span>
+      <div class="progress-bar-inner"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="overlay"></div>
+
+  <main id="main">
+    <div class="page-hero">
+      <div class="page-hero-icon">⭐</div>
+      <div>
+        <h1>Senior / Lead DevOps Path</h1>
+        <p>Design resilient systems, lead engineering teams, and own production at scale — the skills that separate senior engineers from the rest.</p>
+        <div class="hero-tags">
+          <span class="hero-tag">5+ Years</span>
+          <span class="hero-tag">10 Expert Topics</span>
+          <span class="hero-tag">4 Advanced Projects</span>
+          <span class="hero-tag">Leadership Focus</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">Filter:</span>
+      <button class="filter-btn active" data-filter="all">All Topics</button>
+      <button class="filter-btn" data-filter="security">Security</button>
+      <button class="filter-btn" data-filter="sre">SRE</button>
+      <button class="filter-btn" data-filter="architecture">Architecture</button>
+      <button class="filter-btn" data-filter="kubernetes">K8s Advanced</button>
+      <button class="filter-btn" data-filter="serverless">Serverless</button>
+      <button class="filter-btn" data-filter="cost">Cost Ops</button>
+      <button class="filter-btn" data-filter="projects">Projects</button>
+      <button class="filter-btn" data-filter="interview">Interview</button>
+    </div>
+
+    <!-- A. DevSecOps -->
+    <div class="section" id="devsecops" data-topic="security">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🔒</span><h2>A. DevSecOps — Security in the Pipeline</h2></div>
+        <div class="section-meta"><span class="tag">Security</span><span class="reading-time">⏱ ~50 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="devsecops"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <div class="danger">⚠ Security is not an afterthought — it's a first-class citizen in every stage of the pipeline.</div>
+
+        <h3>Secure CI/CD Pipeline — Shift Left Security</h3>
+        <div class="diagram-box">Code Push → SAST (SonarQube) → Secret Scan (TruffleHog) → Build
+   → SCA (Snyk/Trivy) → Container Scan (Trivy) → Sign Image (Cosign)
+   → Deploy → DAST (OWASP ZAP) → Runtime Security (Falco) → Monitor</div>
+
+        <h3>GitHub Actions — Security Scanning Pipeline</h3>
+        <div class="pre-wrap"><pre><code># .github/workflows/security.yml
+name: Security Scan
+
+on: [push, pull_request]
+
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SonarQube scan
+        uses: sonarqube/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+
+  container-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t myapp:${{ github.sha }} .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: myapp:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'         # fail if CRITICAL/HIGH found
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  sign-image:
+    needs: container-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sign container image with Cosign
+        run: cosign sign --yes myregistry/myapp:${{ github.sha }}
+        env:
+          COSIGN_EXPERIMENTAL: 1
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+
+        <h3>Secrets Management — HashiCorp Vault</h3>
+        <div class="pre-wrap"><pre><code># ── Vault setup ──
+vault secrets enable -path=secrets kv-v2
+
+# Store secrets
+vault kv put secrets/myapp/production \
+  db_password="super-secure-password" \
+  api_key="sk-1234567890"
+
+# K8s integration — Vault Agent injector
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  annotations:
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "webapp"
+    vault.hashicorp.com/agent-inject-secret-db: "secrets/data/myapp/production"
+    vault.hashicorp.com/agent-inject-template-db: |
+      {{- with secret "secrets/data/myapp/production" -}}
+      export DB_PASSWORD="{{ .Data.data.db_password }}"
+      {{- end }}
+spec:
+  template:
+    spec:
+      serviceAccountName: webapp  # needs Vault policy attached
+      containers:
+      - name: webapp
+        image: myapp:1.0
+        command: ["/bin/sh", "-c"]
+        args: ["source /vault/secrets/db && node server.js"]
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+
+        <h3>Network Security Policies (Kubernetes)</h3>
+        <div class="pre-wrap"><pre><code>apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: webapp-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: webapp
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: nginx-ingress     # only from ingress controller
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres          # only to database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to: []                      # allow DNS
+    ports:
+    - protocol: UDP
+      port: 53
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+
+        <h3>OPA/Gatekeeper — Policy as Code</h3>
+        <div class="pre-wrap"><pre><code># Constraint: require resource limits on all containers
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredResources
+metadata:
+  name: require-resource-limits
+spec:
+  match:
+    kinds:
+    - apiGroups: [""]
+      kinds: ["Pod"]
+  parameters:
+    limits: ["cpu", "memory"]
+    requests: ["cpu", "memory"]
+
+# Constraint: no latest tags
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sNoLatestTag
+metadata:
+  name: no-latest-tag
+spec:
+  match:
+    kinds:
+    - apiGroups: ["apps"]
+      kinds: ["Deployment", "StatefulSet"]
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+      </div>
+    </div>
+
+    <!-- B. SRE -->
+    <div class="section" id="sre" data-topic="sre">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">📊</span><h2>B. Site Reliability Engineering (SRE)</h2></div>
+        <div class="section-meta"><span class="tag">SRE</span><span class="reading-time">⏱ ~45 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="sre"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <h3>SRE Key Concepts</h3>
+        <table>
+          <tr><th>Term</th><th>Definition</th><th>Example</th></tr>
+          <tr><td><strong>SLI</strong></td><td>Service Level Indicator — what you measure</td><td>Request success rate (%), P99 latency</td></tr>
+          <tr><td><strong>SLO</strong></td><td>Service Level Objective — the target</td><td>99.9% success rate, P99 &lt; 500ms</td></tr>
+          <tr><td><strong>SLA</strong></td><td>Service Level Agreement — the contract</td><td>99.5% uptime or credit refund</td></tr>
+          <tr><td><strong>Error Budget</strong></td><td>Allowed failure = 100% - SLO</td><td>0.1% = 43.8 min/month of downtime</td></tr>
+          <tr><td><strong>Toil</strong></td><td>Manual, repetitive, automatable work</td><td>Manual deploys, ticket-based scaling</td></tr>
+          <tr><td><strong>MTTR</strong></td><td>Mean Time To Recover from incident</td><td>Avg time from alert to resolution</td></tr>
+          <tr><td><strong>MTBF</strong></td><td>Mean Time Between Failures</td><td>Avg time between incidents</td></tr>
+        </table>
+
+        <h3>Error Budget Policy</h3>
+        <div class="diagram-box">Error Budget Remaining       Action Required
+─────────────────────────────────────────────────
+> 50%                    Normal operations, can ship new features freely
+25–50%                   Review release velocity, increase testing
+10–25%                   Freeze non-critical releases, focus on reliability
+< 10%                    All hands on reliability, no new features
+0% (burnt)               Freeze all deployments until next budget period</div>
+
+        <h3>Incident Management Runbook</h3>
+        <div class="pre-wrap"><pre><code># Incident Response Phases
+
+# 1. DETECT (automated)
+#    Prometheus alert fires → PagerDuty page → On-call engineer notified
+
+# 2. RESPOND (< 5 min)
+kubectl get pods -n production               # check pod health
+kubectl top pods -n production               # resource spike?
+kubectl get events -n production --sort-by='.lastTimestamp' | tail -20
+kubectl logs deployment/webapp --since=5m   # recent logs
+
+# 3. MITIGATE (< 30 min)
+# Rollback if recent deploy caused it
+kubectl rollout undo deployment/webapp -n production
+kubectl rollout status deployment/webapp -n production
+
+# Scale out if traffic spike
+kubectl scale deployment/webapp --replicas=10 -n production
+
+# Circuit breaker — divert traffic to maintenance page
+kubectl patch ingress webapp-ingress -n production \
+  -p '{"spec":{"rules":[{"host":"app.com","http":{"paths":[{"path":"/","backend":{"service":{"name":"maintenance-svc","port":{"number":80}}}}]}}]}}'
+
+# 4. RESOLVE — fix root cause
+# 5. POSTMORTEM — blameless, within 24-48 hours after incident
+</code></pre>
+          <span class="lang-label">bash</span><button class="copy-btn">Copy</button></div>
+
+        <h3>Golden Signals (4 SRE Metrics to Monitor)</h3>
+        <div class="arch-grid">
+          <div class="arch-card"><div class="arch-icon">⚡</div><h4>Latency</h4><p>Time to serve a request. Track P50, P95, P99 — not just average.</p></div>
+          <div class="arch-card"><div class="arch-icon">📈</div><h4>Traffic</h4><p>How many requests per second. Helps understand load patterns.</p></div>
+          <div class="arch-card"><div class="arch-icon">❌</div><h4>Errors</h4><p>Rate of failed requests. 5xx per minute, not absolute numbers.</p></div>
+          <div class="arch-card"><div class="arch-icon">💾</div><h4>Saturation</h4><p>How "full" the service is. CPU queue, memory pressure, disk IO.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C. SYSTEM DESIGN -->
+    <div class="section" id="sysdesign" data-topic="architecture">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🏛</span><h2>C. System Design — Production Architecture</h2></div>
+        <div class="section-meta"><span class="tag">Architecture</span><span class="reading-time">⏱ ~55 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="sysdesign"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <h3>High Availability Architecture</h3>
+        <div class="diagram-box">Users → CDN (CloudFront) → WAF (AWS Shield)
+                 ↓
+          ALB (Multi-AZ)
+           /          \
+ AZ-1a (Active)    AZ-1b (Active)
+ K8s workers       K8s workers
+ Auto Scaling       Auto Scaling
+       \              /
+        RDS Multi-AZ
+        Primary + Standby
+        ElastiCache (Redis Cluster)
+        S3 (Cross-region replication)</div>
+
+        <h3>Zero Downtime Deployment Patterns</h3>
+        <table>
+          <tr><th>Pattern</th><th>Traffic Split</th><th>Rollback</th><th>Cost</th></tr>
+          <tr><td>Blue-Green</td><td>All-or-nothing switch</td><td>Instant (flip ALB)</td><td>2x infra during deploy</td></tr>
+          <tr><td>Canary</td><td>5% → 25% → 100%</td><td>Fast (redirect traffic)</td><td>Small overhead</td></tr>
+          <tr><td>Feature Flags</td><td>Per-user control</td><td>Toggle off flag</td><td>Minimal</td></tr>
+          <tr><td>Shadow Mode</td><td>Mirror traffic, don't serve</td><td>N/A (not live)</td><td>2x backend cost</td></tr>
+        </table>
+
+        <h3>CAP Theorem for DevOps</h3>
+        <div class="note">📚 CAP: you can only guarantee 2 of 3: Consistency, Availability, Partition Tolerance. In distributed systems, partition tolerance is mandatory (networks fail), so you choose C or A.</div>
+        <table>
+          <tr><th>System</th><th>Chooses</th><th>Trade-off</th></tr>
+          <tr><td>PostgreSQL, MySQL</td><td>CP</td><td>Will block writes during network partition rather than serve stale data</td></tr>
+          <tr><td>Cassandra, DynamoDB</td><td>AP</td><td>Always available, may return slightly stale data</td></tr>
+          <tr><td>Redis (standalone)</td><td>CP</td><td>Returns error if primary unreachable</td></tr>
+          <tr><td>Redis Cluster</td><td>AP</td><td>Serves reads from replicas even if primary fails</td></tr>
+        </table>
+
+        <h3>Database Scaling Strategies</h3>
+        <div class="pre-wrap"><pre><code># Read Replica — for read-heavy workloads
+Primary (writes) ──replication──► Replica 1 (reads)
+                              ──► Replica 2 (reads)
+                              ──► Replica 3 (reads — analytics)
+
+# Sharding — horizontal partitioning
+Shard 1: users A-M (user_id % 3 == 0)
+Shard 2: users N-R (user_id % 3 == 1)
+Shard 3: users S-Z (user_id % 3 == 2)
+
+# CQRS — separate read/write models
+Write API → Command → Event Store → Projector → Read DB
+                                              → Read API → Client
+
+# Connection pooling (PgBouncer for PostgreSQL)
+docker run -d \
+  -e DATABASE_URL="postgres://user:pass@db:5432/mydb" \
+  -e POOL_MODE=transaction \
+  -e MAX_CLIENT_CONN=1000 \
+  -e DEFAULT_POOL_SIZE=25 \
+  pgbouncer/pgbouncer
+</code></pre>
+          <span class="lang-label">bash</span><button class="copy-btn">Copy</button></div>
+      </div>
+    </div>
+
+    <!-- D. K8s ADVANCED -->
+    <div class="section" id="k8s-advanced" data-topic="kubernetes">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">☸</span><h2>D. Kubernetes Advanced</h2></div>
+        <div class="section-meta"><span class="tag">K8s Expert</span><span class="reading-time">⏱ ~60 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="k8s-advanced"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <h3>Custom Resource Definitions (CRDs)</h3>
+        <div class="pre-wrap"><pre><code>apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: databases.mycompany.io
+spec:
+  group: mycompany.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              engine: { type: string, enum: [postgres, mysql] }
+              version: { type: string }
+              replicas: { type: integer, minimum: 1, maximum: 5 }
+  scope: Namespaced
+  names:
+    plural: databases
+    singular: database
+    kind: Database
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+
+        <h3>RBAC — Role-Based Access Control</h3>
+        <div class="pre-wrap"><pre><code># Create Role (namespace-scoped)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: production
+  name: developer-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "logs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "update"]   # can update but not delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-binding
+  namespace: production
+subjects:
+- kind: User
+  name: alice@company.com
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer-role
+  apiGroup: rbac.authorization.k8s.io
+
+# Test RBAC
+kubectl auth can-i delete pods --namespace=production --as=alice@company.com
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+
+        <h3>Kubernetes Security Context</h3>
+        <div class="pre-wrap"><pre><code>apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true          # don't run as root
+        runAsUser: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault      # restrict syscalls
+      containers:
+      - name: app
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true  # immutable container fs
+          capabilities:
+            drop: [ALL]             # drop all Linux capabilities
+            add: [NET_BIND_SERVICE] # add only what's needed
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp           # writable temp dir
+      volumes:
+      - name: tmp
+        emptyDir: {}
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+
+        <h3>Vertical Pod Autoscaler + KEDA</h3>
+        <div class="pre-wrap"><pre><code># KEDA — scale based on external metrics (SQS queue length)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-scaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: queue-worker
+  minReplicaCount: 1
+  maxReplicaCount: 50
+  triggers:
+  - type: aws-sqs-queue
+    metadata:
+      queueURL: https://sqs.us-east-1.amazonaws.com/123/myqueue
+      queueLength: "10"          # 1 pod per 10 messages in queue
+      awsRegion: us-east-1
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+      </div>
+    </div>
+
+    <!-- E. ISTIO -->
+    <div class="section" id="istio" data-topic="kubernetes">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🕸</span><h2>E. Istio Service Mesh</h2></div>
+        <div class="section-meta"><span class="tag">Service Mesh</span><span class="reading-time">⏱ ~40 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="istio"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <div class="note">💡 Istio handles service-to-service security (mTLS), observability (distributed tracing), and traffic management without code changes.</div>
+
+        <h3>Istio Architecture</h3>
+        <div class="diagram-box">Control Plane: istiod (Pilot + Citadel + Galley)
+   ↓ pushes config ↓
+Data Plane: Envoy sidecar proxy injected into every pod
+   Pod A [app + envoy] ──mTLS──► Pod B [app + envoy]
+                                  Envoy intercepts all traffic</div>
+
+        <h3>Traffic Management — Canary with VirtualService</h3>
+        <div class="pre-wrap"><pre><code>apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: webapp
+spec:
+  hosts: ["webapp"]
+  http:
+  - match:
+    - headers:
+        x-canary:
+          exact: "true"        # route beta testers to v2
+    route:
+    - destination:
+        host: webapp
+        subset: v2
+  - route:                     # everyone else → v1 (90%) and v2 (10%)
+    - destination:
+        host: webapp
+        subset: v1
+      weight: 90
+    - destination:
+        host: webapp
+        subset: v2
+      weight: 10
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: webapp
+spec:
+  host: webapp
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL       # enforce mTLS between services
+    connectionPool:
+      tcp: { maxConnections: 100 }
+      http: { http2MaxRequests: 1000 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s    # circuit breaker
+  subsets:
+  - name: v1
+    labels: { version: v1 }
+  - name: v2
+    labels: { version: v2 }
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+      </div>
+    </div>
+
+    <!-- F. SERVERLESS -->
+    <div class="section" id="serverless" data-topic="serverless">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">⚡</span><h2>F. Serverless Architecture</h2></div>
+        <div class="section-meta"><span class="tag">Cloud Native</span><span class="reading-time">⏱ ~35 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="serverless"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <h3>When to Use Serverless</h3>
+        <table>
+          <tr><th>Good Fit</th><th>Poor Fit</th></tr>
+          <tr><td>Event-driven processing (S3 uploads, SQS messages)</td><td>Long-running processes (&gt; 15 min)</td></tr>
+          <tr><td>Unpredictable/spiky traffic</td><td>Latency-sensitive (cold starts)</td></tr>
+          <tr><td>API backends with low baseline traffic</td><td>Stateful applications</td></tr>
+          <tr><td>Scheduled jobs (ETL, reports)</td><td>High-throughput, steady-state workloads</td></tr>
+        </table>
+
+        <h3>Production Lambda with SAM</h3>
+        <div class="pre-wrap"><pre><code># template.yaml (AWS SAM)
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        NODE_ENV: production
+    Layers:
+      - !Ref DependenciesLayer   # share node_modules across functions
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/api.handler
+      ReservedConcurrentExecutions: 100   # prevent runaway scaling
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+            Auth:
+              DefaultAuthorizer: CognitoAuth
+              Authorizers:
+                CognitoAuth:
+                  UserPoolArn: !GetAtt UserPool.Arn
+
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/processor.handler
+      Timeout: 300               # 5 min for processing
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ProcessingQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
+# Deploy: sam build && sam deploy --guided
+</code></pre>
+          <span class="lang-label">yaml</span><button class="copy-btn">Copy</button></div>
+      </div>
+    </div>
+
+    <!-- G. COST OPTIMIZATION -->
+    <div class="section" id="cost" data-topic="cost">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">💰</span><h2>G. AWS Cost Optimization</h2></div>
+        <div class="section-meta"><span class="tag">FinOps</span><span class="reading-time">⏱ ~30 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="cost"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <h3>Cost Optimization Framework</h3>
+        <table>
+          <tr><th>Strategy</th><th>Savings</th><th>Implementation</th></tr>
+          <tr><td>Right-sizing</td><td>20–40%</td><td>Use AWS Compute Optimizer recommendations, downsize overprovisioned EC2</td></tr>
+          <tr><td>Reserved Instances</td><td>40–60%</td><td>1-year commitment on steady-state workloads</td></tr>
+          <tr><td>Spot Instances</td><td>60–90%</td><td>Stateless workloads, CI runners, batch processing</td></tr>
+          <tr><td>Auto Scaling</td><td>30–50%</td><td>Scale down nights/weekends for non-prod</td></tr>
+          <tr><td>S3 Lifecycle</td><td>10–70%</td><td>Move old objects to Glacier after 90 days</td></tr>
+          <tr><td>NAT Gateway</td><td>Variable</td><td>Use S3/DynamoDB Gateway endpoints (free)</td></tr>
+          <tr><td>Data Transfer</td><td>Variable</td><td>Keep services in same AZ, use CloudFront for global</td></tr>
+        </table>
+
+        <h3>Kubernetes Cost Optimization</h3>
+        <div class="pre-wrap"><pre><code># 1. Request right-sizing — use VPA recommendations
+kubectl top pods -n production --sort-by=memory  # find over-provisioned pods
+
+# 2. Cluster autoscaler
+helm install cluster-autoscaler autoscaler/cluster-autoscaler \
+  --set autoDiscovery.clusterName=my-cluster \
+  --set awsRegion=us-east-1
+
+# 3. Spot instances for node groups (EKS)
+# In nodegroup config:
+instanceTypes: ["m5.xlarge", "m5a.xlarge", "m4.xlarge"]  # multiple types
+capacityType: SPOT
+
+# 4. Karpenter (next-gen cluster autoscaler)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+spec:
+  template:
+    spec:
+      requirements:
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values: ["spot", "on-demand"]
+      - key: node.kubernetes.io/instance-type
+        operator: In
+        values: ["m5.large", "m5.xlarge", "m5a.large"]
+  disruption:
+    consolidationPolicy: WhenEmpty    # bin-pack and remove empty nodes
+    consolidateAfter: 30s
+</code></pre>
+          <span class="lang-label">bash</span><button class="copy-btn">Copy</button></div>
+      </div>
+    </div>
+
+    <!-- H. ARCHITECTURE DECISIONS -->
+    <div class="section" id="architecture" data-topic="architecture">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🧠</span><h2>H. Architecture Decision Records (ADR)</h2></div>
+        <div class="section-meta"><span class="tag">Leadership</span><span class="reading-time">⏱ ~25 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="architecture"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <div class="note">💡 Senior engineers don't just implement — they document decisions and their trade-offs so future engineers understand the WHY.</div>
+
+        <h3>ADR Template</h3>
+        <div class="pre-wrap"><pre><code># docs/adr/0001-use-kubernetes-over-ecs.md
+
+# ADR-0001: Use Kubernetes Over ECS for Container Orchestration
+
+## Status: Accepted (2025-01-15)
+
+## Context
+We need to orchestrate 30+ microservices across 3 environments.
+Our team has K8s expertise. We need custom scheduling, service mesh, and GitOps.
+
+## Decision
+We will use EKS (managed Kubernetes) over ECS.
+
+## Consequences
+
+### Positive
+- Portable — can migrate to other clouds or on-prem if needed
+- Rich ecosystem: Helm, ArgoCD, Karpenter, Istio, KEDA
+- More control over networking and scheduling
+- Team expertise match
+
+### Negative
+- Higher operational complexity than ECS
+- EKS control plane costs ~$73/month per cluster
+- More configuration required initially
+
+## Alternatives Considered
+- **ECS Fargate**: Simpler, lower cost, but vendor lock-in and less ecosystem
+- **Nomad**: Great for multi-cloud but smaller community
+- **Docker Compose on EC2**: Too manual, doesn't scale
+
+## Review Date: 2026-01-15
+</code></pre>
+          <span class="lang-label">markdown</span><button class="copy-btn">Copy</button></div>
+
+        <h3>When to Choose: Microservices vs Monolith</h3>
+        <table>
+          <tr><th>Factor</th><th>Start Monolith When…</th><th>Split to Microservices When…</th></tr>
+          <tr><td>Team size</td><td>&lt; 10 engineers</td><td>Multiple teams, 10+ engineers</td></tr>
+          <tr><td>Scale needs</td><td>Unknown or low</td><td>Different services need different scale</td></tr>
+          <tr><td>Domain clarity</td><td>Domain not well-understood</td><td>Clear bounded contexts defined</td></tr>
+          <tr><td>Deploy frequency</td><td>&lt; 1x/week</td><td>Multiple times per day, different components</td></tr>
+          <tr><td>Failure isolation</td><td>Full failure acceptable</td><td>Partial failure must be isolated</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROJECTS -->
+    <div class="section" id="projects" data-topic="projects">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🏗</span><h2>Advanced Projects (9–12)</h2></div>
+        <div class="section-meta"><span class="tag">Practice</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="projects"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <div class="project-grid">
+          <div class="project-card">
+            <div class="project-num">Project 9 <span class="diff-hard">Expert</span></div>
+            <h4>Serverless API with Lambda + DynamoDB</h4>
+            <p>Build a production serverless REST API: Lambda, API Gateway, DynamoDB, Cognito auth, CloudWatch alarms, X-Ray tracing.</p>
+            <div class="project-tags"><span class="project-tag">AWS Lambda</span><span class="project-tag">API Gateway</span><span class="project-tag">DynamoDB</span><span class="project-tag">SAM</span></div>
+          </div>
+          <div class="project-card">
+            <div class="project-num">Project 10 <span class="diff-hard">Expert</span></div>
+            <h4>DevSecOps Pipeline</h4>
+            <p>Build a secure CI/CD pipeline with SAST, SCA, container scanning, Cosign image signing, and OPA admission control.</p>
+            <div class="project-tags"><span class="project-tag">Trivy</span><span class="project-tag">SonarQube</span><span class="project-tag">Cosign</span><span class="project-tag">OPA</span></div>
+          </div>
+          <div class="project-card">
+            <div class="project-num">Project 11 <span class="diff-hard">Expert</span></div>
+            <h4>Istio Service Mesh on EKS</h4>
+            <p>Deploy microservices with Istio: mTLS, canary releases, distributed tracing with Jaeger, Kiali dashboard.</p>
+            <div class="project-tags"><span class="project-tag">EKS</span><span class="project-tag">Istio</span><span class="project-tag">Jaeger</span><span class="project-tag">Kiali</span></div>
+          </div>
+          <div class="project-card">
+            <div class="project-num">Project 12 <span class="diff-hard">Expert</span></div>
+            <h4>Multi-Region HA WordPress</h4>
+            <p>Global WordPress deployment: RDS Aurora Multi-Region, CloudFront, Elasticache, Route53 failover, DR testing.</p>
+            <div class="project-tags"><span class="project-tag">Aurora</span><span class="project-tag">CloudFront</span><span class="project-tag">Route53</span><span class="project-tag">Terraform</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INTERVIEW -->
+    <div class="section" id="interview" data-topic="interview">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🎯</span><h2>Senior Interview Prep</h2></div>
+        <div class="section-meta"><span class="tag">Interview</span><span class="reading-time">⏱ ~40 min</span><label class="check-label"><input type="checkbox" class="topic-check" data-topic="interview"> Done</label></div>
+      </div>
+      <div class="section-body">
+        <div class="qa-list">
+          <div class="qa"><div class="qa-q">How do you design a system that can handle 1 million requests per day? <span class="arrow">▼</span></div>
+            <div class="qa-a">1M req/day = ~12 req/sec average, but traffic is spiky — plan for 10x peak = 120 req/sec. Architecture: CDN (CloudFront) for static assets reduces origin load 70-80%. Load balancer (ALB) distributes across 3+ app servers in 2 AZs. Horizontal scaling via ASG — scale out at 70% CPU. Redis for session caching (reduce DB hits). Read replicas for DB (separate read/write). Connection pooling (PgBouncer) at 25 connections per app server. In K8s: 3 replicas baseline, HPA scales to 20 at peak. Monitor P99 latency, error rate, and connection pool exhaustion.</div></div>
+
+          <div class="qa"><div class="qa-q">How do you implement GitOps in practice? <span class="arrow">▼</span></div>
+            <div class="qa-a">GitOps means Git is the single source of truth for infrastructure and application state. Implementation with ArgoCD: 1) Separate "config repo" (Helm charts, K8s manifests) from "app repo" (code). 2) CI pipeline builds image, pushes to registry, then updates the image tag in the config repo. 3) ArgoCD watches the config repo and automatically syncs cluster state to match Git. 4) Production changes require PR review — no kubectl apply by humans in production. 5) Rollback = git revert → ArgoCD syncs. Benefits: full audit trail, anyone can see current state, rollbacks are reliable, no config drift. Use ApplicationSet for multi-cluster/multi-env management.</div></div>
+
+          <div class="qa"><div class="qa-q">Your production database is at 95% disk. Walk me through how you handle it. <span class="arrow">▼</span></div>
+            <div class="qa-a">Immediate (0-30 min): 1) Alert triage — confirm free space trend with <code>df -h</code> and growth rate. 2) Find largest tables: <code>SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC</code>. 3) Clear safe large files — WAL archives, temp tables, old logs. 4) If RDS: modify storage for online autoscaling (adds storage live). Short-term: archive/delete old data with ROW-level delete, not table drop. Run VACUUM to reclaim space. Long-term: Implement data retention policy. Partition large tables by date. Move audit logs to S3 + Athena. Set CloudWatch alarm at 70% to give warning. Consider S3-backed columnar storage (Redshift) for analytics data.</div></div>
+
+          <div class="qa"><div class="qa-q">What is your approach to incident postmortems? <span class="arrow">▼</span></div>
+            <div class="qa-a">Blameless postmortem within 24-48 hours. Structure: 1) <strong>Timeline</strong>: What happened, when detected, who involved, what actions were taken. 2) <strong>Root cause</strong>: 5 Whys analysis — keep asking WHY until you reach a systemic issue (not "human error"). 3) <strong>Contributing factors</strong>: Monitoring gaps, deployment without testing, missing runbooks. 4) <strong>Action items</strong>: Each has an owner and deadline. Categories: detection improvement (shorter MTTR), prevention (tests, validation), process (runbooks, rollback procedures). 5) Share widely — make postmortems accessible to all engineers, not just the team involved. Normalize incidents as learning opportunities. Track action item completion. Never assign blame to individuals.</div></div>
+
+          <div class="qa"><div class="qa-q">How do you explain technical trade-offs to non-technical stakeholders? <span class="arrow">▼</span></div>
+            <div class="qa-a">Frame everything in business terms, not technical terms. Instead of "we need to refactor the auth service to reduce technical debt" say "our login system is slowing down 3x a year for maintenance — investing 2 sprints now will save 6 sprint-weeks over the next year." Use the RICE framework: Reach (how many users affected?), Impact (severity?), Confidence (how sure?), Effort (person-weeks). Create a visual — a simple risk/effort matrix on a single slide. Always present options, not just one solution: Option A (fast/cheap/risky) vs Option B (slower/costly/reliable). Never hide risks — stakeholders trust engineers who proactively flag risks over those who promise certainty. End with a clear recommendation and the key assumption that makes it valid.</div></div>
+
+          <div class="qa"><div class="qa-q">How do you set up a multi-cluster Kubernetes strategy? <span class="arrow">▼</span></div>
+            <div class="qa-a">Reasons for multi-cluster: blast radius isolation, compliance (PCI/HIPAA data isolation), multi-region availability, dev/staging/prod separation. Strategies: 1) <strong>Fleet management</strong>: ArgoCD ApplicationSet or Fleet (Rancher) to manage 100s of clusters from single control plane. 2) <strong>Service discovery</strong>: Istio multi-cluster (shared control plane) or Skupper for cross-cluster service exposure. 3) <strong>DNS routing</strong>: Route53 failover between regional clusters. 4) <strong>Shared infrastructure</strong>: Central ECR, shared VPC peering or AWS Transit Gateway. 5) <strong>GitOps</strong>: Cluster-specific Helm value files in Git, ArgoCD syncs appropriate cluster. Key challenge: data gravity — keep services close to their databases to avoid cross-AZ/cross-region latency costs.</div></div>
+        </div>
+
+        <h3>Scenario-Based Questions (Answer Framework)</h3>
+        <div class="note">📋 For scenario questions, use the STAR format: <strong>S</strong>ituation, <strong>T</strong>ask, <strong>A</strong>ction, <strong>R</strong>esult. Always quantify the impact.</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:.5rem;margin-top:.8rem">
+          <li style="font-size:.85rem;color:var(--text3);padding:.3rem 0;border-bottom:1px solid var(--border)">→ "Tell me about a time you improved system reliability" — discuss SLO improvement, MTTR reduction</li>
+          <li style="font-size:.85rem;color:var(--text3);padding:.3rem 0;border-bottom:1px solid var(--border)">→ "How did you handle a major production incident?" — timeline, communication, blameless review</li>
+          <li style="font-size:.85rem;color:var(--text3);padding:.3rem 0;border-bottom:1px solid var(--border)">→ "Describe a time you convinced your team to adopt a new tool" — data-driven, proof of concept, phased rollout</li>
+          <li style="font-size:.85rem;color:var(--text3);padding:.3rem 0">→ "How did you reduce cloud costs?" — specific %, tools used (Cost Explorer, Compute Optimizer), initiatives</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+</div>
+
+<button class="scroll-top" id="scroll-top">↑</button>
+
+<script>
+const THEME_KEY='devops-theme';
+function applyTheme(t){
+  document.documentElement.style.setProperty('--bg',t==='light'?'#ffffff':'#0d1117');
+  document.documentElement.style.setProperty('--surface',t==='light'?'#f6f8fa':'#161b22');
+  document.documentElement.style.setProperty('--surface2',t==='light'?'#eef1f5':'#21262d');
+  document.documentElement.style.setProperty('--border',t==='light'?'#d0d7de':'#30363d');
+  document.documentElement.style.setProperty('--text',t==='light'?'#1f2328':'#f0f6fc');
+  document.documentElement.style.setProperty('--text2',t==='light'?'#24292f':'#c9d1d9');
+  document.documentElement.style.setProperty('--text3',t==='light'?'#57606a':'#8b949e');
+  document.documentElement.style.setProperty('--text4',t==='light'?'#6e7781':'#6e7681');
+  document.documentElement.style.setProperty('--code-bg',t==='light'?'#f6f8fa':'#161b22');
+  document.getElementById('theme-btn').textContent=t==='light'?'🌙':'☀️';
+  localStorage.setItem(THEME_KEY,t);
+}
+applyTheme(localStorage.getItem(THEME_KEY)||'dark');
+document.getElementById('theme-btn').addEventListener('click',()=>applyTheme(localStorage.getItem(THEME_KEY)==='light'?'dark':'light'));
+const sidebar=document.getElementById('sidebar');
+const overlay=document.getElementById('overlay');
+document.getElementById('hamburger').addEventListener('click',()=>{sidebar.classList.toggle('open');overlay.style.display=sidebar.classList.contains('open')?'block':'none';});
+overlay.addEventListener('click',()=>{sidebar.classList.remove('open');overlay.style.display='none';});
+window.addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  const pct=(h.scrollTop||document.body.scrollTop)/(h.scrollHeight-h.clientHeight)*100;
+  document.getElementById('progress-bar').style.width=pct+'%';
+  document.getElementById('scroll-top').classList.toggle('show',pct>10);
+});
+document.getElementById('scroll-top').addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+document.querySelectorAll('.filter-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const f=btn.dataset.filter;
+    document.querySelectorAll('.section[data-topic]').forEach(s=>s.classList.toggle('hidden',f!=='all'&&s.dataset.topic!==f));
+  });
+});
+document.getElementById('search').addEventListener('input',function(){
+  const q=this.value.toLowerCase();
+  document.querySelectorAll('.toc a').forEach(a=>a.classList.toggle('hidden',!a.textContent.toLowerCase().includes(q)));
+});
+const tocLinks=[...document.querySelectorAll('.toc a')];
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){const id=e.target.id;tocLinks.forEach(l=>l.classList.toggle('active',l.getAttribute('href')==='#'+id));}});
+},{rootMargin:'-15% 0px -70% 0px',threshold:0});
+document.querySelectorAll('.section[id]').forEach(s=>observer.observe(s));
+document.querySelectorAll('.pre-wrap').forEach(wrap=>{
+  const btn=wrap.querySelector('.copy-btn');const pre=wrap.querySelector('pre');
+  if(!btn||!pre)return;
+  btn.addEventListener('click',async()=>{
+    try{await navigator.clipboard.writeText(pre.innerText);}catch(e){const ta=document.createElement('textarea');ta.value=pre.innerText;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);}
+    btn.textContent='Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);
+  });
+});
+document.querySelectorAll('.qa').forEach(qa=>qa.querySelector('.qa-q').addEventListener('click',()=>qa.classList.toggle('open')));
+const CHECKS_KEY='senior-checks';
+const saved=JSON.parse(localStorage.getItem(CHECKS_KEY)||'{}');
+const checks=document.querySelectorAll('.topic-check');
+checks.forEach(c=>{
+  if(saved[c.dataset.topic])c.checked=true;
+  c.addEventListener('change',()=>{const d=JSON.parse(localStorage.getItem(CHECKS_KEY)||'{}');d[c.dataset.topic]=c.checked;localStorage.setItem(CHECKS_KEY,JSON.stringify(d));updateProgress();});
+});
+function updateProgress(){const total=checks.length;const done=[...checks].filter(c=>c.checked).length;document.getElementById('progress-text').textContent=`${done} of ${total} topics completed`;document.getElementById('progress-fill').style.width=(done/total*100)+'%';}
+updateProgress();
+</script>
+</body>
+</html>
