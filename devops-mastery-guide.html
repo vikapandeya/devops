@@ -516,6 +516,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
     <div class="toc-section-title">AWS Setup Guides</div>
     <a href="#setup1" class="toc-link">Setup 1 — 2-Tier LEMP + ALB</a>
     <a href="#setup2" class="toc-link">Setup 2 — Multi-Tier + Bastion</a>
+    <a href="#setup3" class="toc-link">Setup 3 — Cloudflare + Terraform + ALB</a>
+    <a href="#setup4" class="toc-link">Setup 4 — K8s Production Project</a>
   </div>
 </nav>
 
@@ -4918,6 +4920,1611 @@ aws route53 change-resource-record-sets \
   <div class="qa-block">
     <div class="question">How do you deploy a code update to both app servers without downtime?</div>
     <div class="answer">Rolling deployment: 1) Deregister App-1 from ALB target group (ALB stops sending traffic to it, existing connections drain). 2) SSH via Bastion to App-1, pull new code, restart services, run smoke test. 3) Re-register App-1 in ALB, wait for health check to pass. 4) Repeat for App-2. Zero downtime because App-2 handles all traffic during App-1 update. Automate this with: an Ansible playbook with serial: 1 (update one at a time), or CodeDeploy with in-place deployment and ALB integration (handles deregistration/registration automatically).</div>
+  </div>
+</div>
+
+<!-- ======================== SETUP 3: Cloudflare + Terraform + ALB ======================== -->
+<div class="section" id="setup3">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(249,115,22,0.15);">☁️</div>
+    <h2>Setup 3 — Cloudflare CDN + WAF + Terraform-managed AWS ALB</h2>
+    <span class="level-tag badge-purple badge">Advanced</span>
+  </div>
+
+  <p>Provision a complete, production-grade web stack entirely through Terraform: AWS VPC, EC2 Auto Scaling Group, Application Load Balancer, ACM certificate — and then sit Cloudflare in front as the CDN, WAF, and DDoS shield. Zero manual clicks.</p>
+
+  <h3>Architecture Overview</h3>
+  <div class="diagram">
+  User → Cloudflare Edge (150+ PoPs worldwide)
+            │  CDN cache / WAF rules / DDoS protection / Rate limiting
+            │  SSL terminates at Cloudflare (Full-Strict mode)
+            ▼
+  AWS ALB  (HTTPS :443, ACM cert — origin cert)
+            │  health checks, sticky sessions
+     ┌──────┴──────┐
+     ▼             ▼
+  EC2 App-1     EC2 App-2     ← Auto Scaling Group (private subnets)
+  (Nginx+PHP)   (Nginx+PHP)
+            │
+            ▼
+        MySQL RDS
+     (Multi-AZ, private)
+
+  Cloudflare → ALB only accepts traffic from Cloudflare IPs (origin protection)
+  Terraform manages: VPC, subnets, SGs, ALB, ASG, ACM, Route53, Cloudflare DNS/WAF</div>
+
+  <div class="tip-box">Cloudflare sits between users and your AWS ALB — users never see your ALB IP. This gives you free DDoS protection, WAF, CDN caching, and Bot management at the edge before traffic hits your infra.</div>
+
+  <h3>Project Structure</h3>
+  <pre><code">terraform-cloudflare-alb/
+├── main.tf
+├── variables.tf
+├── outputs.tf
+├── terraform.tfvars
+├── modules/
+│   ├── vpc/
+│   │   ├── main.tf
+│   │   └── outputs.tf
+│   ├── alb/
+│   │   ├── main.tf
+│   │   └── outputs.tf
+│   ├── asg/
+│   │   ├── main.tf
+│   │   ├── userdata.sh.tpl
+│   │   └── outputs.tf
+│   ├── rds/
+│   │   ├── main.tf
+│   │   └── outputs.tf
+│   └── cloudflare/
+│       ├── main.tf
+│       └── outputs.tf
+└── .github/
+    └── workflows/
+        └── terraform.yml</code></pre>
+
+  <h3>Root main.tf — Wiring all modules</h3>
+  <pre><code">terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
+    random = { source = "hashicorp/random" }
+  }
+  backend "s3" {
+    bucket         = "my-tf-state-bucket"
+    key            = "prod/cloudflare-alb/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+  default_tags {
+    tags = {
+      Project     = var.project
+      Environment = var.environment
+      ManagedBy   = "Terraform"
+    }
+  }
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+# ── VPC ──────────────────────────────────────────────────────────────────────
+module "vpc" {
+  source = "./modules/vpc"
+
+  project     = var.project
+  environment = var.environment
+  vpc_cidr    = "10.0.0.0/16"
+
+  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+  private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
+  db_subnets      = ["10.0.21.0/24", "10.0.22.0/24"]
+  azs             = ["${var.aws_region}a", "${var.aws_region}b"]
+}
+
+# ── ACM Certificate (origin cert for ALB) ────────────────────────────────────
+resource "aws_acm_certificate" "origin" {
+  domain_name       = var.domain_name
+  validation_method = "DNS"
+
+  subject_alternative_names = ["www.${var.domain_name}"]
+
+  lifecycle { create_before_destroy = true }
+}
+
+# Auto-validate via Cloudflare DNS records
+resource "cloudflare_record" "acm_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.origin.domain_validation_options :
+    dvo.domain_name => dvo
+  }
+
+  zone_id = var.cloudflare_zone_id
+  name    = trimsuffix(each.value.resource_record_name, ".")
+  type    = each.value.resource_record_type
+  value   = trimsuffix(each.value.resource_record_value, ".")
+  ttl     = 60
+  proxied = false   # must be DNS-only for ACM validation
+}
+
+resource "aws_acm_certificate_validation" "origin" {
+  certificate_arn         = aws_acm_certificate.origin.arn
+  validation_record_fqdns = [for r in cloudflare_record.acm_validation : r.hostname]
+}
+
+# ── ALB ──────────────────────────────────────────────────────────────────────
+module "alb" {
+  source = "./modules/alb"
+
+  project          = var.project
+  environment      = var.environment
+  vpc_id           = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  certificate_arn  = aws_acm_certificate.origin.arn
+
+  # Critical: only allow traffic from Cloudflare IP ranges (origin protection)
+  cloudflare_ipv4_ranges = var.cloudflare_ipv4_ranges
+  cloudflare_ipv6_ranges = var.cloudflare_ipv6_ranges
+
+  depends_on = [aws_acm_certificate_validation.origin]
+}
+
+# ── Auto Scaling Group ────────────────────────────────────────────────────────
+module "asg" {
+  source = "./modules/asg"
+
+  project             = var.project
+  environment         = var.environment
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  target_group_arn    = module.alb.target_group_arn
+  alb_sg_id           = module.alb.alb_sg_id
+  db_endpoint         = module.rds.endpoint
+  db_secret_arn       = module.rds.secret_arn
+  instance_type       = var.instance_type
+  key_name            = var.key_name
+  min_size            = var.asg_min
+  max_size            = var.asg_max
+  desired_capacity    = var.asg_desired
+}
+
+# ── RDS ──────────────────────────────────────────────────────────────────────
+module "rds" {
+  source = "./modules/rds"
+
+  project        = var.project
+  environment    = var.environment
+  vpc_id         = module.vpc.vpc_id
+  db_subnet_ids  = module.vpc.db_subnet_ids
+  app_sg_id      = module.asg.app_sg_id
+  db_name        = var.db_name
+  db_username    = var.db_username
+  engine_version = "8.0"
+  instance_class = "db.t3.medium"
+  multi_az       = var.environment == "prod"
+}
+
+# ── Cloudflare ───────────────────────────────────────────────────────────────
+module "cloudflare" {
+  source = "./modules/cloudflare"
+
+  zone_id      = var.cloudflare_zone_id
+  domain_name  = var.domain_name
+  alb_dns_name = module.alb.dns_name
+  environment  = var.environment
+}</code></pre>
+
+  <h3>modules/alb/main.tf — ALB locked to Cloudflare IPs</h3>
+  <pre><code"># ALB Security Group — ONLY Cloudflare IP ranges (origin protection)
+resource "aws_security_group" "alb" {
+  name   = "${var.project}-${var.environment}-alb-sg"
+  vpc_id = var.vpc_id
+
+  # Cloudflare IPv4 ranges — port 80
+  dynamic "ingress" {
+    for_each = var.cloudflare_ipv4_ranges
+    content {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "Cloudflare IPv4"
+    }
+  }
+
+  # Cloudflare IPv4 ranges — port 443
+  dynamic "ingress" {
+    for_each = var.cloudflare_ipv4_ranges
+    content {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "Cloudflare IPv4 HTTPS"
+    }
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_lb" "main" {
+  name               = "${var.project}-${var.environment}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.public_subnet_ids
+
+  enable_deletion_protection = var.environment == "prod"
+  drop_invalid_header_fields = true   # security best practice
+
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.id
+    prefix  = "${var.project}-alb"
+    enabled = true
+  }
+}
+
+resource "aws_lb_target_group" "app" {
+  name     = "${var.project}-${var.environment}-app-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+
+  health_check {
+    path                = "/health"
+    interval            = 15
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
+
+  stickiness {
+    type            = "lb_cookie"
+    cookie_duration = 86400
+    enabled         = false   # stateless apps don't need this
+  }
+}
+
+# HTTP → HTTPS redirect
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# HTTPS listener with ACM cert
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+# S3 bucket for ALB access logs
+resource "aws_s3_bucket" "alb_logs" {
+  bucket = "${var.project}-${var.environment}-alb-logs-${random_id.suffix.hex}"
+  force_destroy = var.environment != "prod"
+}
+
+resource "random_id" "suffix" { byte_length = 4 }</code></pre>
+
+  <h3>modules/asg/main.tf — Auto Scaling Group</h3>
+  <pre><code"># Launch Template
+resource "aws_launch_template" "app" {
+  name_prefix   = "${var.project}-${var.environment}-"
+  image_id      = data.aws_ami.amazon_linux.id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  vpc_security_group_ids = [aws_security_group.app.id]
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.app.name
+  }
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      volume_size           = 30
+      volume_type           = "gp3"
+      encrypted             = true
+      delete_on_termination = true
+    }
+  }
+
+  metadata_options {
+    http_tokens   = "required"   # enforce IMDSv2
+    http_endpoint = "enabled"
+  }
+
+  user_data = base64encode(templatefile("${path.module}/userdata.sh.tpl", {
+    db_endpoint   = var.db_endpoint
+    db_secret_arn = var.db_secret_arn
+    environment   = var.environment
+  }))
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = { Name = "${var.project}-${var.environment}-app" }
+  }
+
+  lifecycle { create_before_destroy = true }
+}
+
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter { name = "name";  values = ["al2023-ami-*-x86_64"] }
+  filter { name = "state"; values = ["available"] }
+}
+
+# Auto Scaling Group
+resource "aws_autoscaling_group" "app" {
+  name                = "${var.project}-${var.environment}-asg"
+  min_size            = var.min_size
+  max_size            = var.max_size
+  desired_capacity    = var.desired_capacity
+  vpc_zone_identifier = var.private_subnet_ids
+  target_group_arns   = [var.target_group_arn]
+  health_check_type   = "ELB"
+  health_check_grace_period = 120
+
+  launch_template {
+    id      = aws_launch_template.app.id
+    version = "$Latest"
+  }
+
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50
+      instance_warmup        = 60
+    }
+  }
+
+  dynamic "tag" {
+    for_each = {
+      Name        = "${var.project}-${var.environment}-app"
+      Environment = var.environment
+    }
+    content {
+      key                 = tag.key
+      value               = tag.value
+      propagate_at_launch = true
+    }
+  }
+}
+
+# Target tracking — keep CPU at 60%
+resource "aws_autoscaling_policy" "cpu" {
+  name                   = "${var.project}-cpu-target"
+  autoscaling_group_name = aws_autoscaling_group.app.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+    target_value = 60.0
+  }
+}
+
+# Scale on ALB request count per target
+resource "aws_autoscaling_policy" "requests" {
+  name                   = "${var.project}-request-target"
+  autoscaling_group_name = aws_autoscaling_group.app.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ALBRequestCountPerTarget"
+      resource_label = "${var.alb_arn_suffix}/${var.target_group_arn_suffix}"
+    }
+    target_value = 1000.0   # 1000 req/target before scaling
+  }
+}</code></pre>
+
+  <h3>modules/cloudflare/main.tf — DNS, WAF, Page Rules</h3>
+  <pre><code"># DNS — point domain to ALB (proxied = Cloudflare in front)
+resource "cloudflare_record" "root" {
+  zone_id = var.zone_id
+  name    = var.domain_name
+  type    = "CNAME"
+  value   = var.alb_dns_name
+  proxied = true   # orange-cloud = Cloudflare proxy active
+  ttl     = 1      # auto when proxied
+}
+
+resource "cloudflare_record" "www" {
+  zone_id = var.zone_id
+  name    = "www"
+  type    = "CNAME"
+  value   = var.domain_name
+  proxied = true
+  ttl     = 1
+}
+
+# WAF Rules — block common attacks
+resource "cloudflare_ruleset" "waf" {
+  zone_id     = var.zone_id
+  name        = "WAF Rules"
+  description = "Managed WAF + custom rules"
+  kind        = "zone"
+  phase       = "http_request_firewall_managed"
+
+  rules {
+    action      = "execute"
+    description = "Cloudflare Managed Ruleset"
+    expression  = "true"
+    action_parameters {
+      id = "efb7b8c949ac4650a09736fc376e9aee"   # Cloudflare Managed Rules
+      overrides {
+        action            = "block"
+        sensitivity_level = "default"
+      }
+    }
+    enabled = true
+  }
+}
+
+# Custom WAF — rate limiting
+resource "cloudflare_ruleset" "rate_limit" {
+  zone_id     = var.zone_id
+  name        = "Rate Limiting"
+  kind        = "zone"
+  phase       = "http_ratelimit"
+
+  rules {
+    action      = "block"
+    description = "Block 100+ req/min per IP on /api"
+    expression  = "(http.request.uri.path matches \"^/api\")"
+    ratelimit {
+      characteristics      = ["cf.colo.id", "ip.src"]
+      period               = 60
+      requests_per_period  = 100
+      mitigation_timeout   = 600
+    }
+    enabled = true
+  }
+}
+
+# Security Headers via Transform Rules
+resource "cloudflare_ruleset" "security_headers" {
+  zone_id     = var.zone_id
+  name        = "Security Headers"
+  kind        = "zone"
+  phase       = "http_response_headers_transform"
+
+  rules {
+    action      = "rewrite"
+    description = "Add security headers"
+    expression  = "true"
+    action_parameters {
+      headers {
+        name      = "Strict-Transport-Security"
+        operation = "set"
+        value     = "max-age=31536000; includeSubDomains; preload"
+      }
+      headers {
+        name      = "X-Content-Type-Options"
+        operation = "set"
+        value     = "nosniff"
+      }
+      headers {
+        name      = "X-Frame-Options"
+        operation = "set"
+        value     = "SAMEORIGIN"
+      }
+      headers {
+        name      = "Permissions-Policy"
+        operation = "set"
+        value     = "camera=(), microphone=(), geolocation=()"
+      }
+    }
+    enabled = true
+  }
+}
+
+# Cache rules — cache static assets at edge
+resource "cloudflare_ruleset" "cache" {
+  zone_id     = var.zone_id
+  name        = "Cache Rules"
+  kind        = "zone"
+  phase       = "http_request_cache_settings"
+
+  rules {
+    action      = "set_cache_settings"
+    description = "Cache static assets 7 days"
+    expression  = "(http.request.uri.path.extension in {\"css\" \"js\" \"png\" \"jpg\" \"webp\" \"woff2\" \"svg\"})"
+    action_parameters {
+      cache = true
+      edge_ttl {
+        mode    = "override_origin"
+        default = 604800   # 7 days
+      }
+      browser_ttl {
+        mode    = "override_origin"
+        default = 86400    # 1 day
+      }
+    }
+    enabled = true
+  }
+
+  rules {
+    action      = "set_cache_settings"
+    description = "Do not cache API responses"
+    expression  = "(http.request.uri.path matches \"^/api\")"
+    action_parameters {
+      cache = false
+    }
+    enabled = true
+  }
+}
+
+# Firewall — geo-block (optional example)
+resource "cloudflare_ruleset" "firewall_custom" {
+  zone_id     = var.zone_id
+  name        = "Custom Firewall"
+  kind        = "zone"
+  phase       = "http_request_firewall_custom"
+
+  rules {
+    action      = "challenge"   # CAPTCHA challenge
+    description = "Challenge high-risk countries"
+    expression  = "(ip.geoip.country in {\"CN\" \"RU\" \"KP\"} and not cf.client.bot)"
+    enabled     = false   # set to true if needed
+  }
+}
+
+# SSL/TLS settings
+resource "cloudflare_zone_settings_override" "main" {
+  zone_id = var.zone_id
+  settings {
+    ssl                      = "full_strict"   # end-to-end encryption
+    min_tls_version          = "1.2"
+    tls_1_3                  = "zrt"           # TLS 1.3 + 0-RTT
+    automatic_https_rewrites = "on"
+    always_use_https         = "on"
+    brotli                   = "on"
+    http3                    = "on"
+    rocket_loader            = "off"           # may break some JS
+    development_mode         = "off"
+  }
+}</code></pre>
+
+  <h3>variables.tf + terraform.tfvars</h3>
+  <pre><code"># variables.tf
+variable "aws_region"           { default = "us-east-1" }
+variable "project"              { default = "myapp" }
+variable "environment"          {}
+variable "domain_name"          {}
+variable "cloudflare_zone_id"   {}
+variable "cloudflare_api_token" { sensitive = true }
+variable "key_name"             {}
+variable "instance_type"        { default = "t3.small" }
+variable "asg_min"              { default = 2 }
+variable "asg_max"              { default = 10 }
+variable "asg_desired"          { default = 2 }
+variable "db_name"              { default = "appdb" }
+variable "db_username"          { default = "appuser" }
+
+# Cloudflare IP ranges (update periodically from https://www.cloudflare.com/ips/)
+variable "cloudflare_ipv4_ranges" {
+  default = [
+    "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22",
+    "103.31.4.0/22",   "141.101.64.0/18", "108.162.192.0/18",
+    "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22",
+    "198.41.128.0/17", "162.158.0.0/15",  "104.16.0.0/13",
+    "104.24.0.0/14",   "172.64.0.0/13",   "131.0.72.0/22"
+  ]
+}
+variable "cloudflare_ipv6_ranges" {
+  default = [
+    "2400:cb00::/32", "2606:4700::/32", "2803:f800::/32",
+    "2405:b500::/32", "2405:8100::/32", "2a06:98c0::/29",
+    "2c0f:f248::/32"
+  ]
+}
+
+# terraform.tfvars (do NOT commit to git — use .gitignore)
+environment          = "prod"
+domain_name          = "yourdomain.com"
+cloudflare_zone_id   = "abc123def456"
+cloudflare_api_token = "your_cloudflare_api_token"
+key_name             = "prod-keypair"
+instance_type        = "t3.medium"
+asg_min             = 2
+asg_max             = 8
+asg_desired         = 3</code></pre>
+
+  <h3>GitHub Actions — Terraform CI/CD</h3>
+  <pre><code"># .github/workflows/terraform.yml
+name: Terraform
+
+on:
+  push:
+    branches: [main]
+    paths: ['terraform/**']
+  pull_request:
+    branches: [main]
+    paths: ['terraform/**']
+
+permissions:
+  id-token: write   # OIDC auth to AWS (no static keys)
+  contents: read
+  pull-requests: write
+
+env:
+  TF_VERSION: "1.7.0"
+  AWS_REGION: "us-east-1"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Run tfsec (security scan)
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform/
+
+      - name: Run Checkov (IaC compliance)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform/
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out=tfplan -input=false
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
+
+      - name: Post plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = '${{ steps.plan.outputs.stdout }}';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## Terraform Plan\n\`\`\`\n' + plan + '\n\`\`\`'
+            })
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}</code></pre>
+
+  <h3>Deploy & Verify</h3>
+  <pre><code"># 1. Initialize and plan
+cd terraform-cloudflare-alb/
+export TF_VAR_cloudflare_api_token="your_token"
+terraform init
+terraform plan -var-file=terraform.tfvars
+
+# 2. Apply (creates everything in ~5 minutes)
+terraform apply -var-file=terraform.tfvars
+
+# 3. Outputs
+terraform output
+# alb_dns_name    = "myapp-prod-alb-123456.us-east-1.elb.amazonaws.com"
+# cloudflare_ns   = ["ns1.cloudflare.com", ...]
+# asg_name        = "myapp-prod-asg"
+# rds_endpoint    = "myapp-prod-db.abc.us-east-1.rds.amazonaws.com"
+
+# 4. Verify Cloudflare is proxying
+curl -sI https://yourdomain.com | grep -i "server\|cf-ray\|cf-cache"
+# Server: cloudflare
+# cf-ray: 87abc...
+# cf-cache-status: HIT  (after first request)
+
+# 5. Test WAF
+curl -A "sqlmap" https://yourdomain.com/api/users
+# Expected: 403 Forbidden — WAF blocked bad user-agent
+
+# 6. Verify origin is locked (ALB rejects non-Cloudflare)
+curl -sI http://&lt;ALB-DNS&gt; --connect-timeout 5
+# Expected: connection refused or 403
+
+# 7. Check ASG health
+aws autoscaling describe-auto-scaling-groups \
+  --auto-scaling-group-names myapp-prod-asg \
+  --query 'AutoScalingGroups[0].Instances[*].{ID:InstanceId,State:HealthStatus,AZ:AvailabilityZone}'</code></pre>
+
+  <div class="success-box">
+    Expected outcomes:<br>
+    • <code>https://yourdomain.com</code> loads, served from Cloudflare edge (cf-ray header present)<br>
+    • Static assets cached at Cloudflare (cf-cache-status: HIT after second request)<br>
+    • Direct ALB access returns 403 (origin locked to Cloudflare IPs only)<br>
+    • ASG scales from 2 → N instances automatically under load<br>
+    • tfsec + Checkov pass in CI with zero HIGH findings<br>
+    • All infra reproducible: <code>terraform destroy &amp;&amp; terraform apply</code>
+  </div>
+
+  <h3>Interview Questions — Cloudflare + Terraform + ALB</h3>
+  <div class="qa-block">
+    <div class="question">Why lock the ALB security group to Cloudflare IP ranges only?</div>
+    <div class="answer">Without this, anyone who discovers your ALB DNS name (via DNS history, certificate transparency logs, or scanning) can bypass Cloudflare entirely — hitting your origin directly and bypassing WAF, rate limiting, and DDoS protection. By restricting ALB ingress to Cloudflare's published IP ranges, the ALB refuses all non-Cloudflare traffic. Cloudflare also adds the <code>CF-Connecting-IP</code> header with the real client IP so your app can log it. Update the IP list periodically — Cloudflare publishes changes at <code>cloudflare.com/ips</code>. The Terraform variable makes this a one-line update + apply.</div>
+  </div>
+  <div class="qa-block">
+    <div class="question">What is Cloudflare Full-Strict SSL mode and why is it important?</div>
+    <div class="answer"><strong>Flexible:</strong> Cloudflare ↔ Origin is HTTP (unencrypted) — dangerous. <br><strong>Full:</strong> Cloudflare ↔ Origin is HTTPS but accepts self-signed certs — vulnerable to MITM between CF and ALB. <br><strong>Full-Strict:</strong> Cloudflare ↔ Origin is HTTPS and validates the cert — requires a valid cert on the ALB (ACM cert). This is the only mode that gives true end-to-end encryption. In our setup: user ↔ CF = TLS (CF cert), CF ↔ ALB = TLS (ACM cert). Without Full-Strict, you have a false sense of security.</div>
+  </div>
+  <div class="qa-block">
+    <div class="question">How do you manage Cloudflare API tokens securely in Terraform CI/CD?</div>
+    <div class="answer">Never hardcode in .tf files or tfvars committed to git. Use: 1) GitHub Actions Secrets → passed as <code>TF_VAR_cloudflare_api_token</code> environment variable. 2) HashiCorp Vault → CI fetches token at runtime. 3) AWS Secrets Manager → fetch in pipeline before terraform apply. 4) Mark the variable <code>sensitive = true</code> in Terraform so it never appears in plan output or state diffs. 5) Create a scoped API token in Cloudflare (Zone:DNS:Edit + Zone:Firewall:Edit only — not the global API key). Rotate every 90 days.</div>
+  </div>
+</div>
+
+<!-- ======================== SETUP 4: Kubernetes Production Project ======================== -->
+<div class="section" id="setup4">
+  <div class="section-header">
+    <div class="section-icon" style="background:rgba(124,58,237,0.15);">☸️</div>
+    <h2>Setup 4 — Production Kubernetes Project: Full-Stack App with GitOps, Monitoring &amp; Security</h2>
+    <span class="level-tag badge-purple badge">Advanced / Senior</span>
+  </div>
+
+  <p>Deploy a production-grade microservices application on Kubernetes using industry best practices: Helm charts, ArgoCD GitOps, Prometheus + Grafana monitoring, cert-manager TLS, Network Policies, Pod Disruption Budgets, RBAC, and horizontal autoscaling. Everything is code — zero kubectl manual commands in prod.</p>
+
+  <h3>Architecture Overview</h3>
+  <div class="diagram">
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                        EKS CLUSTER                                   │
+  │                                                                       │
+  │   ┌──────────────────────────────────────────────────────────────┐   │
+  │   │  ingress-nginx namespace                                      │   │
+  │   │  ┌────────────────────┐                                       │   │
+  │   │  │  Nginx Ingress     │ ← AWS NLB (external)                  │   │
+  │   │  │  (cert-manager     │   TLS terminated here                 │   │
+  │   │  │   Let's Encrypt)   │                                       │   │
+  │   │  └────────┬───────────┘                                       │   │
+  │   └───────────│───────────────────────────────────────────────────┘   │
+  │               │ /api/* → api-svc    / → frontend-svc                  │
+  │   ┌───────────┴────────────────────────────────────────────────────┐  │
+  │   │  production namespace                                          │  │
+  │   │  ┌─────────────────┐      ┌─────────────────────────────────┐ │  │
+  │   │  │  Frontend       │      │  API Service                    │ │  │
+  │   │  │  (React/Nginx)  │      │  (Node.js)                      │ │  │
+  │   │  │  3 replicas     │      │  3 replicas, HPA 3-15           │ │  │
+  │   │  │  HPA 3-10       │      │  Readiness/Liveness probes      │ │  │
+  │   │  └─────────────────┘      └──────────────┬──────────────────┘ │  │
+  │   │                                           │                    │  │
+  │   │  ┌────────────────────────────────────────▼──────────────────┐│  │
+  │   │  │  PostgreSQL (StatefulSet)  Redis (StatefulSet)            ││  │
+  │   │  │  1 primary + 2 replicas    3-node cluster                 ││  │
+  │   │  │  PVC: gp3 100Gi encrypted  PVC: 10Gi                     ││  │
+  │   │  └───────────────────────────────────────────────────────────┘│  │
+  │   └────────────────────────────────────────────────────────────────┘  │
+  │                                                                        │
+  │   ┌──────────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
+  │   │ argocd namespace │  │ monitoring   │  │ cert-manager ns      │   │
+  │   │ (GitOps CD)      │  │ (Prometheus  │  │ (Let's Encrypt TLS)  │   │
+  │   └──────────────────┘  │  + Grafana)  │  └──────────────────────┘   │
+  │                          └──────────────┘                              │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  Git Repo → ArgoCD watches → auto-sync → K8s cluster</div>
+
+  <h3>Repository Structure</h3>
+  <pre><code">k8s-production-app/
+├── apps/
+│   ├── frontend/
+│   │   ├── Dockerfile
+│   │   └── src/
+│   └── api/
+│       ├── Dockerfile
+│       └── src/
+├── helm/
+│   └── myapp/                   # custom Helm chart
+│       ├── Chart.yaml
+│       ├── values.yaml          # defaults
+│       ├── values-prod.yaml     # production overrides
+│       └── templates/
+│           ├── deployment.yaml
+│           ├── service.yaml
+│           ├── ingress.yaml
+│           ├── hpa.yaml
+│           ├── pdb.yaml
+│           ├── networkpolicy.yaml
+│           ├── configmap.yaml
+│           ├── serviceaccount.yaml
+│           └── servicemonitor.yaml
+├── gitops/
+│   ├── argocd/
+│   │   ├── app-of-apps.yaml     # root ArgoCD Application
+│   │   ├── myapp.yaml
+│   │   ├── monitoring.yaml
+│   │   └── cert-manager.yaml
+│   └── namespaces/
+│       └── namespaces.yaml
+├── terraform/                   # EKS cluster provisioning
+│   ├── main.tf
+│   └── addons.tf
+└── .github/
+    └── workflows/
+        ├── build.yml
+        └── promote.yml</code></pre>
+
+  <h3>Step 1 — Provision EKS with Terraform</h3>
+  <pre><code"># terraform/main.tf
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "myapp-prod"
+  cluster_version = "1.30"
+
+  vpc_id                         = module.vpc.vpc_id
+  subnet_ids                     = module.vpc.private_subnets
+  cluster_endpoint_public_access = true
+  cluster_endpoint_public_access_cidrs = ["YOUR_OFFICE_IP/32"]
+
+  # Cluster addons
+  cluster_addons = {
+    coredns                = { most_recent = true }
+    kube-proxy             = { most_recent = true }
+    vpc-cni                = { most_recent = true }
+    aws-ebs-csi-driver     = { most_recent = true }
+    aws-efs-csi-driver     = { most_recent = true }
+  }
+
+  # IRSA — IAM roles for service accounts (no static keys in pods)
+  enable_irsa = true
+
+  eks_managed_node_groups = {
+    system = {
+      name           = "system"
+      instance_types = ["m6i.large"]
+      min_size       = 2
+      max_size       = 4
+      desired_size   = 2
+      labels         = { role = "system" }
+      taints         = [{ key = "CriticalAddonsOnly", value = "true", effect = "NO_SCHEDULE" }]
+    }
+    app = {
+      name           = "app"
+      instance_types = ["m6i.xlarge", "m6a.xlarge"]  # multiple types for Spot
+      capacity_type  = "SPOT"                          # 70% cheaper for app nodes
+      min_size       = 3
+      max_size       = 20
+      desired_size   = 4
+      labels         = { role = "app" }
+    }
+  }
+}
+
+# terraform/addons.tf — install cluster addons via Helm
+resource "helm_release" "ingress_nginx" {
+  name             = "ingress-nginx"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  version          = "4.10.0"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+
+  set { name = "controller.replicaCount";           value = "2" }
+  set { name = "controller.metrics.enabled";        value = "true" }
+  set { name = "controller.metrics.serviceMonitor.enabled"; value = "true" }
+  set { name = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type";
+        value = "nlb" }
+}
+
+resource "helm_release" "cert_manager" {
+  name             = "cert-manager"
+  repository       = "https://charts.jetstack.io"
+  chart            = "cert-manager"
+  version          = "v1.14.0"
+  namespace        = "cert-manager"
+  create_namespace = true
+  set { name = "installCRDs"; value = "true" }
+}
+
+resource "helm_release" "argocd" {
+  name             = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = "6.7.0"
+  namespace        = "argocd"
+  create_namespace = true
+
+  values = [file("${path.module}/argocd-values.yaml")]
+}
+
+resource "helm_release" "kube_prometheus" {
+  name             = "monitoring"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "kube-prometheus-stack"
+  version          = "57.0.0"
+  namespace        = "monitoring"
+  create_namespace = true
+
+  values = [file("${path.module}/monitoring-values.yaml")]
+}</code></pre>
+
+  <h3>Step 2 — Helm Chart: Full Production Template Set</h3>
+
+  <h4>helm/myapp/templates/deployment.yaml</h4>
+  <pre><code">{{- range $name, $svc := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{ $name }}
+    version: {{ $.Values.image.tag | quote }}
+spec:
+  replicas: {{ $svc.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        version: {{ $.Values.image.tag | quote }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $svc.port | quote }}
+        prometheus.io/path: "/metrics"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+    spec:
+      serviceAccountName: {{ $name }}-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: {{ $name }}
+        image: {{ $.Values.image.registry }}/{{ $.Values.image.repository }}/{{ $name }}:{{ $.Values.image.tag }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {{ $svc.port }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            memory: {{ $svc.resources.requests.memory }}
+            cpu:    {{ $svc.resources.requests.cpu }}
+          limits:
+            memory: {{ $svc.resources.limits.memory }}
+            cpu:    {{ $svc.resources.limits.cpu }}
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: {{ $svc.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: {{ $svc.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+        envFrom:
+        - configMapRef:
+            name: {{ $name }}-config
+        - secretRef:
+            name: {{ $name }}-secret
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        {{- if $svc.extraVolumeMounts }}
+        {{- toYaml $svc.extraVolumeMounts | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: {{ $name }}
+            topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: {{ $name }}
+{{- end }}</code></pre>
+
+  <h4>helm/myapp/templates/hpa.yaml</h4>
+  <pre><code">{{- range $name, $svc := .Values.services }}
+{{- if $svc.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}-hpa
+  namespace: {{ $.Values.namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ $svc.hpa.minReplicas }}
+  maxReplicas: {{ $svc.hpa.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ $svc.hpa.cpuTarget }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+{{- end }}
+{{- end }}</code></pre>
+
+  <h4>helm/myapp/templates/pdb.yaml (Pod Disruption Budget)</h4>
+  <pre><code">{{- range $name, $svc := .Values.services }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}-pdb
+  namespace: {{ $.Values.namespace }}
+spec:
+  minAvailable: {{ $svc.pdb.minAvailable | default "50%" }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+{{- end }}</code></pre>
+
+  <h4>helm/myapp/templates/networkpolicy.yaml</h4>
+  <pre><code">---
+# API service — only accepts from ingress-nginx and frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: api
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - port: 3000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - port: 6379
+  - to:   # allow DNS
+    - namespaceSelector: {}
+    ports:
+    - port: 53
+      protocol: UDP
+---
+# Postgres — only from API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: api
+    ports:
+    - port: 5432</code></pre>
+
+  <h3>Step 3 — values-prod.yaml</h3>
+  <pre><code">namespace: production
+image:
+  registry: ghcr.io
+  repository: myorg
+  tag: "1.5.2"
+
+services:
+  frontend:
+    replicaCount: 3
+    port: 80
+    resources:
+      requests: { memory: "128Mi", cpu: "50m" }
+      limits:   { memory: "256Mi", cpu: "200m" }
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 10
+      cpuTarget: 70
+    pdb:
+      minAvailable: "67%"
+
+  api:
+    replicaCount: 3
+    port: 3000
+    resources:
+      requests: { memory: "256Mi", cpu: "100m" }
+      limits:   { memory: "512Mi", cpu: "500m" }
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 15
+      cpuTarget: 60
+    pdb:
+      minAvailable: "67%"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: myapp.com
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+
+postgres:
+  storageClass: gp3
+  storageSize: 100Gi
+  replicas: 3
+
+redis:
+  storageClass: gp3
+  storageSize: 10Gi
+  replicas: 3</code></pre>
+
+  <h3>Step 4 — ArgoCD GitOps Setup</h3>
+  <pre><code"># gitops/argocd/app-of-apps.yaml
+# This single file tells ArgoCD to manage all other ArgoCD Applications
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/myorg/k8s-production-app
+    targetRevision: main
+    path: gitops/argocd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m
+        factor: 2
+
+---
+# gitops/argocd/myapp.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myapp-production
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/myorg/k8s-production-app
+    targetRevision: main
+    path: helm/myapp
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false   # prod: selfHeal off — human reviews diffs
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  revisionHistoryLimit: 10</code></pre>
+
+  <h3>Step 5 — cert-manager: Free Let's Encrypt TLS</h3>
+  <pre><code"># ClusterIssuer — production Let's Encrypt
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: devops@myapp.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+# Ingress with auto-TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myapp-ingress
+  namespace: production
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts: [myapp.com, www.myapp.com]
+    secretName: myapp-tls-cert   # cert-manager creates this automatically
+  rules:
+  - host: myapp.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service: { name: api, port: { number: 3000 } }
+      - path: /
+        pathType: Prefix
+        backend:
+          service: { name: frontend, port: { number: 80 } }</code></pre>
+
+  <h3>Step 6 — Monitoring: Prometheus ServiceMonitor + Grafana Alerts</h3>
+  <pre><code"># helm/myapp/templates/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: myapp-metrics
+  namespace: production
+  labels:
+    release: monitoring   # must match Prometheus selector
+spec:
+  selector:
+    matchLabels:
+      app: api
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+
+---
+# PrometheusRule — app-specific alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: myapp-alerts
+  namespace: production
+spec:
+  groups:
+  - name: myapp.rules
+    rules:
+    - alert: APIHighErrorRate
+      expr: |
+        rate(http_requests_total{namespace="production",app="api",status=~"5.."}[5m]) /
+        rate(http_requests_total{namespace="production",app="api"}[5m]) > 0.01
+      for: 2m
+      labels:
+        severity: critical
+        team: backend
+      annotations:
+        summary: "API error rate above 1%"
+        description: "Error rate is {{ $value | humanizePercentage }} — check API logs"
+        runbook_url: "https://wiki.myapp.com/runbooks/api-errors"
+
+    - alert: APIHighLatency
+      expr: |
+        histogram_quantile(0.99,
+          rate(http_request_duration_seconds_bucket{app="api"}[5m])
+        ) > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "API p99 latency above 2s"
+
+    - alert: PodRestarting
+      expr: increase(kube_pod_container_status_restarts_total{namespace="production"}[1h]) > 3
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ $labels.pod }} restarted {{ $value }} times in 1h"</code></pre>
+
+  <h3>Step 7 — CI/CD: Build → Push → GitOps Promote</h3>
+  <pre><code"># .github/workflows/build.yml
+name: Build and Promote
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, api]
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        run: echo "tag=sha-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/${{ matrix.service }}
+          push: true
+          tags: ghcr.io/myorg/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/myorg/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+          exit-code: '1'
+          severity: 'CRITICAL'
+
+  promote:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      # Update image tag in Helm values — ArgoCD auto-detects the git change and deploys
+      - name: Update image tag in values-prod.yaml
+        run: |
+          sed -i "s/tag: .*/tag: \"${{ needs.build.outputs.image-tag }}\"/" \
+            helm/myapp/values-prod.yaml
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm/myapp/values-prod.yaml
+          git commit -m "chore: deploy ${{ needs.build.outputs.image-tag }} to prod"
+          git push</code></pre>
+
+  <h3>Step 8 — RBAC: Least-Privilege Service Accounts</h3>
+  <pre><code"># Per-service ServiceAccount (no default SA with broad perms)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-sa
+  namespace: production
+  annotations:
+    # IRSA — maps SA to IAM role (for AWS SDK calls from pods)
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/myapp-api-role
+automountServiceAccountToken: false   # only mount when actually needed
+---
+# Role — minimal permissions this SA needs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: api-role
+  namespace: production
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["api-config"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["api-secret"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: api-rb
+  namespace: production
+subjects:
+- kind: ServiceAccount
+  name: api-sa
+  namespace: production
+roleRef:
+  kind: Role
+  name: api-role
+  apiGroup: rbac.authorization.k8s.io</code></pre>
+
+  <h3>Step 9 — Verify the Full Stack</h3>
+  <pre><code"># Bootstrap (run once)
+aws eks update-kubeconfig --name myapp-prod --region us-east-1
+
+# Apply ArgoCD app-of-apps — it manages everything else
+kubectl apply -f gitops/argocd/app-of-apps.yaml
+
+# Watch ArgoCD sync
+kubectl get applications -n argocd -w
+
+# After a few minutes — check everything
+kubectl get pods -n production
+kubectl get pods -n monitoring
+kubectl get pods -n ingress-nginx
+kubectl get pods -n cert-manager
+kubectl get certificates -n production   # check TLS cert issued
+
+# Test autoscaling — generate load
+kubectl run load-test --image=busybox --rm -it -- \
+  /bin/sh -c "while true; do wget -q -O- http://api.production.svc/health; done"
+
+# Watch HPA scale up
+kubectl get hpa -n production -w
+
+# Check Prometheus targets
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+# Open http://localhost:9090/targets — all should be UP
+
+# Check Grafana
+kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80
+# Open http://localhost:3000 — import dashboard ID 15760 (K8s cluster)
+
+# Simulate rolling update — just push new code → CI builds → updates values-prod.yaml
+# ArgoCD detects git change → runs helm upgrade → rolling update begins
+kubectl rollout status deployment/api -n production -w</code></pre>
+
+  <div class="success-box">
+    Final state of this K8s project:<br>
+    • <strong>GitOps</strong>: every production change goes through git — zero kubectl in prod<br>
+    • <strong>Auto-TLS</strong>: cert-manager issues and renews Let's Encrypt certs automatically<br>
+    • <strong>Autoscaling</strong>: HPA scales frontend (3-10) and API (3-15) on CPU + memory<br>
+    • <strong>Zero downtime</strong>: PDB ensures 67%+ pods always up during deploys/node drains<br>
+    • <strong>Network isolation</strong>: NetworkPolicy denies all traffic except explicitly allowed paths<br>
+    • <strong>Monitoring</strong>: Prometheus scrapes all pods, alerts fire to Slack via Alertmanager<br>
+    • <strong>Security</strong>: non-root pods, read-only rootfs, IRSA (no static AWS keys in pods)<br>
+    • <strong>Multi-AZ</strong>: topologySpreadConstraints spread pods across AZs and nodes
+  </div>
+
+  <h3>Interview Questions — Kubernetes Production</h3>
+  <div class="qa-block">
+    <div class="question">What is GitOps and how does ArgoCD implement it?</div>
+    <div class="answer">GitOps is a practice where Git is the single source of truth for both application code and infrastructure state. Any change to the cluster must be made via a git commit — never direct kubectl. ArgoCD implements this by continuously watching a git repository and comparing its state against the live cluster. If they diverge (someone ran kubectl manually, or a pod crashed), ArgoCD either alerts or auto-syncs back to the git state (selfHeal). Benefits: full audit trail (git log = deployment history), easy rollback (git revert), PR-based approval for production changes, and disaster recovery (re-apply the git repo to any cluster and it self-assembles).</div>
+  </div>
+  <div class="qa-block">
+    <div class="question">Why use Pod Disruption Budgets and when do they activate?</div>
+    <div class="answer">PDBs prevent Kubernetes from removing too many pods simultaneously during voluntary disruptions — node drains (<code>kubectl drain</code>), cluster upgrades, or Cluster Autoscaler scale-down. Without PDB: draining a node could take down all 3 replicas if they happen to be on that node, causing outage. With <code>minAvailable: 67%</code> on a 3-replica deployment: at most 1 pod can be evicted at a time, always keeping 2 running. PDBs do NOT apply to involuntary disruptions (node hardware failure, OOMKill). They're essential for safe cluster upgrades and maintenance windows.</div>
+  </div>
+  <div class="qa-block">
+    <div class="question">How does IRSA (IAM Roles for Service Accounts) work and why is it better than node-level IAM roles?</div>
+    <div class="answer">IRSA maps a Kubernetes ServiceAccount to an AWS IAM Role using OIDC federation. The pod's service account token is exchanged for temporary AWS credentials via AWS STS — no static access keys stored anywhere. Why better than node IAM roles: with node roles, ALL pods on that node inherit the role's permissions (a compromised pod gets all node permissions). With IRSA, each pod/service gets its own minimal IAM role — blast radius of a compromise is limited to exactly what that service needs. Setup: annotate the K8s ServiceAccount with <code>eks.amazonaws.com/role-arn</code>, configure the IAM role trust policy to allow the OIDC provider to assume it.</div>
+  </div>
+  <div class="qa-block">
+    <div class="question">A production deployment is stuck — 0 of 3 pods running after a Helm upgrade. How do you debug and recover?</div>
+    <div class="answer">1) <code>kubectl get pods -n production</code> — check pod status (Pending? ImagePullBackOff? CrashLoop?). 2) <code>kubectl describe pod &lt;pod&gt;</code> — read the Events section for root cause. 3) <code>kubectl logs &lt;pod&gt; --previous</code> — previous container logs. 4) <code>kubectl get events -n production --sort-by=.lastTimestamp</code> — cluster events. 5) If it's a bad image: <code>helm rollback myapp 1 -n production</code> — rolls back to previous Helm revision instantly. 6) If it's a config issue: fix values, run <code>helm upgrade</code> again. 7) After recovery: check why CI let a bad image through — add better smoke tests in the promote workflow.</div>
   </div>
 </div>
 
