@@ -285,6 +285,48 @@ tr:nth-child(even) td{background:rgba(255,255,255,.02)}
   main{padding:0}
   .section{border:1px solid #ccc;break-inside:avoid;margin-bottom:1rem}
 }
+
+.sol-list{display:flex;flex-direction:column;gap:1.2rem;margin-top:1rem}
+.sol-item{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.sol-item-header{
+  padding:.8rem 1.2rem;background:var(--surface2);
+  display:flex;align-items:center;gap:.8rem;cursor:pointer;
+  justify-content:space-between;
+}
+.sol-item-header:hover{background:rgba(255,255,255,.04)}
+.sol-title-wrap{display:flex;align-items:center;gap:.8rem}
+.sol-num{
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(var(--accent-r,63),var(--accent-g,185),var(--accent-b,80),.15);
+  color:var(--accent);font-size:.75rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid rgba(var(--accent-r,63),var(--accent-g,185),var(--accent-b,80),.3);
+}
+.sol-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.sol-arrow{font-size:.7rem;color:var(--text4);transition:transform .2s}
+.sol-item.open .sol-arrow{transform:rotate(180deg)}
+.sol-body{display:none;padding:1.2rem}
+.sol-item.open .sol-body{display:block}
+.sol-steps{display:flex;flex-direction:column;gap:.8rem}
+.sol-step{
+  display:flex;gap:.8rem;align-items:flex-start;
+  padding:.7rem;border-radius:8px;background:rgba(255,255,255,.02);
+  border:1px solid var(--border);
+}
+.step-num{
+  width:22px;height:22px;border-radius:50%;background:var(--accent);
+  color:#000;font-size:.7rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.15rem;
+}
+.step-content{flex:1;min-width:0}
+.step-content strong{display:block;font-size:.85rem;color:var(--text);margin-bottom:.3rem}
+.step-content p{font-size:.82rem;margin-bottom:.4rem}
+.step-content pre{font-size:.78rem;padding:.7rem;margin:.4rem 0}
+.sol-verify{
+  margin-top:1rem;padding:.8rem 1rem;border-radius:8px;
+  background:rgba(63,185,80,.07);border-left:3px solid #3fb950;font-size:.82rem;color:var(--text3);
+}
+
 </style>
 </head>
 <body>
@@ -1698,6 +1740,335 @@ on:
           </div>
         </div>
 
+        <h3 style="margin-top:1.5rem">Step-by-Step Solutions</h3>
+        <div class="sol-list">
+          <div class="sol-item" id="sol-1">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">1</div><span class="sol-title">Project 1: Dockerize a Static Web App</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Create project structure</strong>
+                  <pre><code>mkdir static-app && cd static-app
+mkdir -p src
+touch src/index.html Dockerfile .dockerignore</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>Create index.html</strong>
+                  <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;My DevOps App&lt;/title&gt;
+  &lt;style&gt;
+    body { font-family: sans-serif; background: #0d1117; color: #f0f6fc;
+           display: flex; align-items: center; justify-content: center;
+           height: 100vh; margin: 0; }
+    .box { text-align: center; padding: 2rem; border: 1px solid #30363d;
+           border-radius: 12px; }
+    h1 { color: #3fb950; }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class="box"&gt;
+    &lt;h1&gt;Dockerized!&lt;/h1&gt;
+    &lt;p&gt;Running inside an Nginx container&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/body&gt;&lt;/html&gt;</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Write Dockerfile</strong>
+                  <pre><code>FROM nginx:alpine
+WORKDIR /usr/share/nginx/html
+COPY src/ .
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD wget -qO- http://localhost/ || exit 1</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Create .dockerignore</strong>
+                  <pre><code>.git
+*.md
+Dockerfile
+.dockerignore</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">5</div><div class="step-content">
+                  <strong>Build &amp; run locally</strong>
+                  <pre><code># Build image
+docker build -t static-app:1.0 .
+
+# Run container
+docker run -d --name mysite -p 8080:80 static-app:1.0
+
+# Test
+curl http://localhost:8080
+docker logs mysite
+docker stats mysite    # resource usage</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">6</div><div class="step-content">
+                  <strong>Push to Docker Hub</strong>
+                  <pre><code># Login
+docker login
+
+# Tag with your username
+docker tag static-app:1.0 YOUR_USERNAME/static-app:1.0
+docker tag static-app:1.0 YOUR_USERNAME/static-app:latest
+
+# Push
+docker push YOUR_USERNAME/static-app:1.0
+docker push YOUR_USERNAME/static-app:latest</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Open http://localhost:8080 in browser — you should see the styled page. Check Docker Hub to confirm the image appears in your repository.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-2">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">2</div><span class="sol-title">Project 2: GitHub Actions CI Pipeline</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Create a Node.js application</strong>
+                  <pre><code>mkdir node-ci-app && cd node-ci-app
+npm init -y
+npm install express
+npm install --save-dev jest supertest</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>Create server.js</strong>
+                  <pre><code>const express = require("express");
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => res.json({ status: "ok", version: "1.0" }));
+app.get("/health", (req, res) => res.json({ healthy: true }));
+
+if (require.main === module) {
+  app.listen(PORT, () => console.log("Server running on " + PORT));
+}
+module.exports = app;</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Create server.test.js</strong>
+                  <pre><code>const request = require("supertest");
+const app = require("./server");
+
+test("GET / returns status ok", async () => {
+  const res = await request(app).get("/");
+  expect(res.statusCode).toBe(200);
+  expect(res.body.status).toBe("ok");
+});
+
+test("GET /health returns healthy", async () => {
+  const res = await request(app).get("/health");
+  expect(res.body.healthy).toBe(true);
+});</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Add scripts to package.json</strong>
+                  <pre><code>"scripts": {
+  "start": "node server.js",
+  "test": "jest --coverage",
+  "lint": "echo lint ok"
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">5</div><div class="step-content">
+                  <strong>Create Dockerfile</strong>
+                  <pre><code>FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3000
+HEALTHCHECK CMD wget -qO- http://localhost:3000/health || exit 1
+CMD ["node", "server.js"]</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">6</div><div class="step-content">
+                  <strong>Create .github/workflows/ci.yml</strong>
+                  <pre><code>name: CI/CD Pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/node-ci-app:latest
+            ${{ secrets.DOCKER_USERNAME }}/node-ci-app:${{ github.sha }}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">7</div><div class="step-content">
+                  <strong>Add Docker Hub secrets to GitHub</strong>
+                  <pre><code># Go to: GitHub Repo → Settings → Secrets and variables → Actions
+# Add:
+#   DOCKER_USERNAME  = your Docker Hub username
+#   DOCKER_TOKEN     = Docker Hub access token
+#   (create token at hub.docker.com → Account Settings → Security)
+
+# Then push your code:
+git add . && git commit -m "ci: add GitHub Actions pipeline"
+git push origin main
+
+# Watch it run:
+# GitHub Repo → Actions tab → click the running workflow</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Push a commit — the Actions tab should show green checkmarks for test → docker jobs. Check Docker Hub for the pushed image with the git SHA tag.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-3">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">3</div><span class="sol-title">Project 3: Multi-Container App with Docker Compose</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Project structure</strong>
+                  <pre><code>mkdir compose-app && cd compose-app
+mkdir app
+touch app/server.js app/package.json Dockerfile docker-compose.yml .env</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>Create Node.js API (app/server.js)</strong>
+                  <pre><code>const express = require("express");
+const { Pool } = require("pg");
+const redis = require("redis");
+
+const app = express();
+app.use(express.json());
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS
+});
+
+const redisClient = redis.createClient({
+  socket: { host: process.env.REDIS_HOST, port: 6379 }
+});
+redisClient.connect();
+
+app.get("/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    await redisClient.ping();
+    res.json({ db: "ok", redis: "ok" });
+  } catch(e) {
+    res.status(503).json({ error: e.message });
+  }
+});
+
+app.listen(3000, () => console.log("API running on :3000"));</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Create .env file</strong>
+                  <pre><code>DB_HOST=db
+DB_NAME=appdb
+DB_USER=appuser
+DB_PASS=secretpass
+POSTGRES_DB=appdb
+POSTGRES_USER=appuser
+POSTGRES_PASSWORD=secretpass
+REDIS_HOST=redis</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Create docker-compose.yml</strong>
+                  <pre><code>version: "3.9"
+services:
+  app:
+    build: .
+    ports: ["3000:3000"]
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">5</div><div class="step-content">
+                  <strong>Start and test</strong>
+                  <pre><code># Start all services
+docker compose up -d
+
+# Check all are healthy
+docker compose ps
+
+# Test health endpoint
+curl http://localhost:3000/health
+# {"db":"ok","redis":"ok"}
+
+# View logs from all services
+docker compose logs -f
+
+# Shell into app container
+docker compose exec app sh
+
+# Stop everything
+docker compose down
+docker compose down -v  # also remove volumes</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> <code>curl http://localhost:3000/health</code> returns <code>{"db":"ok","redis":"ok"}</code>. Run <code>docker compose ps</code> — all 3 services should show "healthy".</div>
+            </div>
+          </div>
+        </div>
+
         <div style="margin-top:1.5rem">
           <h3>Project Checklist</h3>
           <ul class="checklist">
@@ -1881,6 +2252,14 @@ document.querySelectorAll('.pre-wrap').forEach(wrap=>{
 // ── QA accordion ──
 document.querySelectorAll('.qa').forEach(qa=>{
   qa.querySelector('.qa-q').addEventListener('click',()=>qa.classList.toggle('open'));
+});
+
+
+// ── Solution accordions ──
+document.querySelectorAll('.sol-item-header').forEach(h=>{
+  h.addEventListener('click',()=>{
+    h.closest('.sol-item').classList.toggle('open');
+  });
 });
 
 // ── Topic checkboxes + progress ──

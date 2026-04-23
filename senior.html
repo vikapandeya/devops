@@ -121,6 +121,48 @@ tr:nth-child(even) td{background:rgba(255,255,255,.02)}
 @media(max-width:900px){.sidebar{position:fixed;top:57px;bottom:0;left:-300px;z-index:95;width:var(--sidebar-w);transition:left .25s ease}.sidebar.open{left:0}.sidebar-overlay{display:block}.hamburger{display:flex!important}}
 @media(max-width:600px){main{padding:1rem}.page-hero{padding:1.2rem}.section-body{padding:.9rem 1rem}.section-header{padding:.9rem 1rem}.level-switch{display:none}}
 @media print{.topnav,.sidebar,.filter-bar,.scroll-top,.sidebar-overlay{display:none!important}.layout{margin-top:0}main{padding:0}.section{border:1px solid #ccc;break-inside:avoid}}
+
+.sol-list{display:flex;flex-direction:column;gap:1.2rem;margin-top:1rem}
+.sol-item{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.sol-item-header{
+  padding:.8rem 1.2rem;background:var(--surface2);
+  display:flex;align-items:center;gap:.8rem;cursor:pointer;
+  justify-content:space-between;
+}
+.sol-item-header:hover{background:rgba(255,255,255,.04)}
+.sol-title-wrap{display:flex;align-items:center;gap:.8rem}
+.sol-num{
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(var(--accent-r,63),var(--accent-g,185),var(--accent-b,80),.15);
+  color:var(--accent);font-size:.75rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid rgba(var(--accent-r,63),var(--accent-g,185),var(--accent-b,80),.3);
+}
+.sol-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.sol-arrow{font-size:.7rem;color:var(--text4);transition:transform .2s}
+.sol-item.open .sol-arrow{transform:rotate(180deg)}
+.sol-body{display:none;padding:1.2rem}
+.sol-item.open .sol-body{display:block}
+.sol-steps{display:flex;flex-direction:column;gap:.8rem}
+.sol-step{
+  display:flex;gap:.8rem;align-items:flex-start;
+  padding:.7rem;border-radius:8px;background:rgba(255,255,255,.02);
+  border:1px solid var(--border);
+}
+.step-num{
+  width:22px;height:22px;border-radius:50%;background:var(--accent);
+  color:#000;font-size:.7rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.15rem;
+}
+.step-content{flex:1;min-width:0}
+.step-content strong{display:block;font-size:.85rem;color:var(--text);margin-bottom:.3rem}
+.step-content p{font-size:.82rem;margin-bottom:.4rem}
+.step-content pre{font-size:.78rem;padding:.7rem;margin:.4rem 0}
+.sol-verify{
+  margin-top:1rem;padding:.8rem 1rem;border-radius:8px;
+  background:rgba(188,140,255,.07);border-left:3px solid #bc8cff;font-size:.82rem;color:var(--text3);
+}
+
 </style>
 </head>
 <body>
@@ -1591,6 +1633,523 @@ producer.flush()
             <h4>Multi-Region HA WordPress</h4>
             <p>Global WordPress deployment: RDS Aurora Multi-Region, CloudFront, Elasticache, Route53 failover, DR testing.</p>
             <div class="project-tags"><span class="project-tag">Aurora</span><span class="project-tag">CloudFront</span><span class="project-tag">Route53</span><span class="project-tag">Terraform</span></div>
+          </div>
+        </div>
+        <h3 style="margin-top:1.5rem">Step-by-Step Solutions</h3>
+        <div class="sol-list">
+          <div class="sol-item" id="sol-9">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">9</div><span class="sol-title">Project 9: Serverless API with Lambda + DynamoDB</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Bootstrap with SAM CLI</strong>
+                  <pre><code">pip install aws-sam-cli
+sam init --runtime python3.12 --name serverless-api --app-template hello-world
+cd serverless-api
+
+# Structure
+serverless-api/
+├── template.yaml       # SAM/CloudFormation template
+├── src/
+│   ├── list_items.py
+│   ├── get_item.py
+│   ├── create_item.py
+│   └── delete_item.py
+└── tests/</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>template.yaml — DynamoDB + Lambda + API Gateway</strong>
+                  <pre><code">AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref ItemsTable
+    Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref ItemsTable
+
+Resources:
+  ItemsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-items"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: id, AttributeType: S }
+      KeySchema:
+        - { AttributeName: id, KeyType: HASH }
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: list_items.handler
+      Events:
+        ListItems:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: GET
+        CreateItem:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: POST
+        GetItem:
+          Type: Api
+          Properties:
+            Path: /items/{id}
+            Method: GET
+        DeleteItem:
+          Type: Api
+          Properties:
+            Path: /items/{id}
+            Method: DELETE
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>src/list_items.py</strong>
+                  <pre><code">import json, boto3, os
+from decimal import Decimal
+
+dynamodb = boto3.resource("dynamodb")
+table = dynamodb.Table(os.environ["TABLE_NAME"])
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Decimal): return float(o)
+        return super().default(o)
+
+def handler(event, context):
+    try:
+        result = table.scan(Limit=100)
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps(result["Items"], cls=DecimalEncoder)
+        }
+    except Exception as e:
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Build, deploy &amp; test</strong>
+                  <pre><code">sam build
+sam local start-api           # test locally at http://localhost:3000
+
+# Deploy to AWS
+sam deploy --guided
+# Enter: stack name, region, confirm changes
+
+# Test deployed API
+API_URL=$(aws cloudformation describe-stacks \
+  --stack-name serverless-api \
+  --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+  --output text)
+
+# Create item
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"name":"DevOps","category":"tech"}' $API_URL/items
+
+# List items
+curl $API_URL/items
+
+# Delete stack when done
+sam delete</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> API Gateway URL returns items from DynamoDB. Test all CRUD operations. Check CloudWatch logs for each Lambda invocation. DynamoDB console shows items created.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-10">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">10</div><span class="sol-title">Project 10: Complete DevSecOps Pipeline</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>.github/workflows/devsecops.yml — Full security pipeline</strong>
+                  <pre><code">name: DevSecOps Pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sast:
+    name: SAST — Code Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/secrets
+            p/javascript
+
+  iac-scan:
+    name: IaC Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy IaC scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: .
+          exit-code: 1
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-iac.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: trivy-iac.sarif }
+
+  build-and-scan:
+    name: Build + Container Scan + Sign
+    needs: [sast, iac-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write     # for keyless Cosign signing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+
+      - name: Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          exit-code: 1
+          severity: CRITICAL
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          artifact-name: sbom.spdx.json
+
+      - name: Push image
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign image
+        run: cosign sign --yes ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+  policy-check:
+    name: K8s Manifest Policy Gate
+    needs: build-and-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install conftest
+        run: |
+          wget -q https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_Linux_x86_64.tar.gz
+          tar xf conftest_Linux_x86_64.tar.gz && mv conftest /usr/local/bin/
+      - name: Run OPA policy checks
+        run: conftest test k8s/*.yaml --policy policies/ --output github</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>policies/k8s.rego — OPA policies</strong>
+                  <pre><code">package main
+
+deny[msg] {
+  input.kind == "Deployment"
+  c := input.spec.template.spec.containers[_]
+  not c.securityContext.runAsNonRoot
+  msg := sprintf("Container %v: set runAsNonRoot: true", [c.name])
+}
+
+deny[msg] {
+  input.kind == "Deployment"
+  c := input.spec.template.spec.containers[_]
+  not c.resources.limits.memory
+  msg := sprintf("Container %v: set memory limit", [c.name])
+}
+
+deny[msg] {
+  input.kind == "Deployment"
+  c := input.spec.template.spec.containers[_]
+  c.image == "latest"
+  msg := sprintf("Container %v: never use :latest tag in production", [c.name])
+}
+
+warn[msg] {
+  input.kind == "Deployment"
+  not input.spec.template.spec.containers[_].readinessProbe
+  msg := "Deployment missing readinessProbe"
+}</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Open a PR with a known vulnerability (old npm package). Pipeline should fail at container scan with CRITICAL severity. Fix the vulnerability, PR should pass all gates. Check GitHub Security tab for SARIF reports.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-11">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">11</div><span class="sol-title">Project 11: Istio Service Mesh on EKS</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Install Istio on EKS</strong>
+                  <pre><code"># Download istioctl
+curl -L https://istio.io/downloadIstio | sh -
+export PATH="$PWD/istio-1.20.0/bin:$PATH"
+
+# Install with demo profile (use production for prod)
+istioctl install --set profile=demo -y
+
+# Verify installation
+kubectl get pods -n istio-system
+istioctl verify-install
+
+# Enable sidecar injection on namespace
+kubectl label namespace production istio-injection=enabled
+
+# Install observability addons (Kiali, Jaeger, Grafana)
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/kiali.yaml
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/jaeger.yaml
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/grafana.yaml</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>Canary deployment with VirtualService (90/10 split)</strong>
+                  <pre><code">---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: webapp
+  namespace: production
+spec:
+  host: webapp-svc
+  subsets:
+  - name: v1
+    labels: { version: v1 }
+  - name: v2
+    labels: { version: v2 }
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: webapp
+  namespace: production
+spec:
+  hosts:
+  - webapp-svc
+  - app.example.com
+  http:
+  - route:
+    - destination:
+        host: webapp-svc
+        subset: v1
+      weight: 90
+    - destination:
+        host: webapp-svc
+        subset: v2
+      weight: 10
+    timeout: 10s
+    retries:
+      attempts: 3
+      perTryTimeout: 3s</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Enable mutual TLS (mTLS)</strong>
+                  <pre><code">---
+# Enforce strict mTLS in the production namespace
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: production
+spec:
+  mtls:
+    mode: STRICT       # reject non-mTLS traffic
+---
+# Allow only frontend to call backend
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: backend-policy
+  namespace: production
+spec:
+  selector:
+    matchLabels: { app: backend }
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/production/sa/frontend-sa"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Gradually shift canary to 100%</strong>
+                  <pre><code"># Generate load and watch metrics in Kiali
+kubectl port-forward svc/kiali -n istio-system 20001:20001 &
+# Open http://localhost:20001
+
+# Shift canary: 50/50
+kubectl patch vs webapp -n production --type merge \
+  -p '{"spec":{"http":[{"route":[{"destination":{"host":"webapp-svc","subset":"v1"},"weight":50},{"destination":{"host":"webapp-svc","subset":"v2"},"weight":50}]}]}}'
+
+# If metrics look good: 0/100
+kubectl patch vs webapp -n production --type merge \
+  -p '{"spec":{"http":[{"route":[{"destination":{"host":"webapp-svc","subset":"v2"},"weight":100}]}]}}'
+
+# Roll back immediately if issues
+kubectl patch vs webapp -n production --type merge \
+  -p '{"spec":{"http":[{"route":[{"destination":{"host":"webapp-svc","subset":"v1"},"weight":100}]}]}}'</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Kiali graph shows traffic split between v1/v2. Jaeger traces show requests flowing through both versions. mTLS lock icon appears in Kiali for all service connections. AuthorizationPolicy blocks unauthorized service calls.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-12">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">12</div><span class="sol-title">Project 12: Multi-Region HA Architecture</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Aurora Global Database (Primary: us-east-1)</strong>
+                  <pre><code">resource "aws_rds_global_cluster" "main" {
+  global_cluster_identifier = "myapp-global"
+  engine                    = "aurora-postgresql"
+  engine_version            = "15.4"
+  database_name             = "appdb"
+}
+
+resource "aws_rds_cluster" "primary" {
+  provider                  = aws.us_east_1
+  cluster_identifier        = "myapp-primary"
+  engine                    = "aurora-postgresql"
+  global_cluster_identifier = aws_rds_global_cluster.main.id
+  master_username           = "appuser"
+  master_password           = var.db_password
+  db_subnet_group_name      = aws_db_subnet_group.primary.name
+  vpc_security_group_ids    = [aws_security_group.rds_primary.id]
+}
+
+resource "aws_rds_cluster" "secondary" {
+  provider                  = aws.eu_west_1
+  cluster_identifier        = "myapp-secondary"
+  engine                    = "aurora-postgresql"
+  global_cluster_identifier = aws_rds_global_cluster.main.id
+  # Read replica: no username/password needed
+  db_subnet_group_name      = aws_db_subnet_group.secondary.name
+  lifecycle { ignore_changes = [replication_source_identifier] }
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>ECS Service in both regions (Terraform)</strong>
+                  <pre><code"># Deploy same ECS cluster + service in each region
+# Module pattern:
+module "app_us" {
+  source = "./modules/ecs-region"
+  providers = { aws = aws.us_east_1 }
+  region      = "us-east-1"
+  image       = "123456789.dkr.ecr.us-east-1.amazonaws.com/myapp:1.0"
+  db_endpoint = aws_rds_cluster.primary.endpoint
+  vpc_id      = aws_vpc.us.id
+  subnets     = aws_subnet.us_private[*].id
+}
+
+module "app_eu" {
+  source = "./modules/ecs-region"
+  providers = { aws = aws.eu_west_1 }
+  region      = "eu-west-1"
+  image       = "123456789.dkr.ecr.eu-west-1.amazonaws.com/myapp:1.0"
+  db_endpoint = aws_rds_cluster.secondary.reader_endpoint
+  vpc_id      = aws_vpc.eu.id
+  subnets     = aws_subnet.eu_private[*].id
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Route53 Failover Routing + Health Checks</strong>
+                  <pre><code">resource "aws_route53_health_check" "us" {
+  fqdn              = module.app_us.alb_dns
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 30
+  tags = { Name = "us-east-1-health" }
+}
+
+resource "aws_route53_record" "primary" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "app.example.com"
+  type    = "A"
+  set_identifier = "us-east-1"
+  failover_routing_policy { type = "PRIMARY" }
+  health_check_id = aws_route53_health_check.us.id
+  alias {
+    name                   = module.app_us.alb_dns
+    zone_id                = module.app_us.alb_zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "secondary" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "app.example.com"
+  type    = "A"
+  set_identifier = "eu-west-1"
+  failover_routing_policy { type = "SECONDARY" }
+  alias {
+    name                   = module.app_eu.alb_dns
+    zone_id                = module.app_eu.alb_zone_id
+    evaluate_target_health = true
+  }
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Test failover</strong>
+                  <pre><code"># Test DNS resolution
+dig app.example.com
+curl https://app.example.com/health
+
+# Simulate region failure: stop all ECS tasks in us-east-1
+aws ecs update-service --cluster myapp-us --service myapp \
+  --desired-count 0 --region us-east-1
+
+# Wait for Route53 health check to fail (30s × 3 = 90 seconds)
+watch -n 5 "dig app.example.com +short"
+# Should flip to EU ALB IP
+
+# Verify which region is serving
+curl -s https://app.example.com/api/region
+
+# Restore us-east-1
+aws ecs update-service --cluster myapp-us --service myapp \
+  --desired-count 2 --region us-east-1</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> When us-east-1 ECS tasks are stopped, DNS automatically fails over to eu-west-1 within ~2 minutes. Aurora secondary becomes primary during failover (RTO &lt; 1 min). Restore us-east-1 and traffic returns after health check passes.</div>
+            </div>
           </div>
         </div>
       </div>

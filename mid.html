@@ -122,6 +122,48 @@ tr:nth-child(even) td{background:rgba(255,255,255,.02)}
 @media(max-width:900px){.sidebar{position:fixed;top:57px;bottom:0;left:-300px;z-index:95;width:var(--sidebar-w);transition:left .25s ease}.sidebar.open{left:0}.sidebar-overlay{display:block}.hamburger{display:flex!important}}
 @media(max-width:600px){main{padding:1rem}.page-hero{padding:1.2rem}.section-body{padding:.9rem 1rem}.section-header{padding:.9rem 1rem}.level-switch{display:none}}
 @media print{.topnav,.sidebar,.filter-bar,.scroll-top,.sidebar-overlay{display:none!important}.layout{margin-top:0}main{padding:0}.section{border:1px solid #ccc;break-inside:avoid}}
+
+.sol-list{display:flex;flex-direction:column;gap:1.2rem;margin-top:1rem}
+.sol-item{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.sol-item-header{
+  padding:.8rem 1.2rem;background:var(--surface2);
+  display:flex;align-items:center;gap:.8rem;cursor:pointer;
+  justify-content:space-between;
+}
+.sol-item-header:hover{background:rgba(255,255,255,.04)}
+.sol-title-wrap{display:flex;align-items:center;gap:.8rem}
+.sol-num{
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(var(--accent-r,63),var(--accent-g,185),var(--accent-b,80),.15);
+  color:var(--accent);font-size:.75rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid rgba(var(--accent-r,63),var(--accent-g,185),var(--accent-b,80),.3);
+}
+.sol-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.sol-arrow{font-size:.7rem;color:var(--text4);transition:transform .2s}
+.sol-item.open .sol-arrow{transform:rotate(180deg)}
+.sol-body{display:none;padding:1.2rem}
+.sol-item.open .sol-body{display:block}
+.sol-steps{display:flex;flex-direction:column;gap:.8rem}
+.sol-step{
+  display:flex;gap:.8rem;align-items:flex-start;
+  padding:.7rem;border-radius:8px;background:rgba(255,255,255,.02);
+  border:1px solid var(--border);
+}
+.step-num{
+  width:22px;height:22px;border-radius:50%;background:var(--accent);
+  color:#000;font-size:.7rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.15rem;
+}
+.step-content{flex:1;min-width:0}
+.step-content strong{display:block;font-size:.85rem;color:var(--text);margin-bottom:.3rem}
+.step-content p{font-size:.82rem;margin-bottom:.4rem}
+.step-content pre{font-size:.78rem;padding:.7rem;margin:.4rem 0}
+.sol-verify{
+  margin-top:1rem;padding:.8rem 1rem;border-radius:8px;
+  background:rgba(88,166,255,.07);border-left:3px solid #58a6ff;font-size:.82rem;color:var(--text3);
+}
+
 </style>
 </head>
 <body>
@@ -1973,6 +2015,646 @@ output {
             <h4>Jenkins + Kubernetes Blue-Green Deploy</h4>
             <p>Set up Jenkins with Kubernetes plugin, implement blue-green deployment with automated smoke tests and rollback.</p>
             <div class="project-tags"><span class="project-tag">Jenkins</span><span class="project-tag">Kubernetes</span><span class="project-tag">Blue-Green</span></div>
+          </div>
+        </div>
+        <h3 style="margin-top:1.5rem">Step-by-Step Solutions</h3>
+        <div class="sol-list">
+          <div class="sol-item" id="sol-4">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">4</div><span class="sol-title">Project 4: 2-Tier AWS Infrastructure with Terraform</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Project structure &amp; remote state bootstrap</strong>
+                  <pre><code>mkdir tf-aws-2tier && cd tf-aws-2tier
+mkdir -p modules/{vpc,ec2,rds}
+touch main.tf variables.tf outputs.tf terraform.tfvars
+
+# First: create S3 + DynamoDB for state (ONE-TIME manual step)
+aws s3 mb s3://mycompany-terraform-state --region us-east-1
+aws s3api put-bucket-versioning --bucket mycompany-terraform-state \
+  --versioning-configuration Status=Enabled
+aws dynamodb create-table --table-name terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>main.tf — provider + backend</strong>
+                  <pre><code>terraform {
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+  backend "s3" {
+    bucket         = "mycompany-terraform-state"
+    key            = "2tier/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+
+provider "aws" { region = var.region }
+
+# ── VPC ──
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "5.1.1"
+  name = "${var.project}-vpc"
+  cidr = "10.0.0.0/16"
+  azs             = ["${var.region}a", "${var.region}b"]
+  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+  private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
+  database_subnets= ["10.0.21.0/24", "10.0.22.0/24"]
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  create_database_subnet_group = true
+  tags = local.common_tags
+}
+
+locals {
+  common_tags = {
+    Project   = var.project
+    ManagedBy = "terraform"
+  }
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>EC2 Launch Template + Auto Scaling Group + ALB</strong>
+                  <pre><code"># Security groups
+resource "aws_security_group" "alb" {
+  name   = "${var.project}-alb-sg"
+  vpc_id = module.vpc.vpc_id
+  ingress { from_port=80; to_port=80; protocol="tcp"; cidr_blocks=["0.0.0.0/0"] }
+  ingress { from_port=443; to_port=443; protocol="tcp"; cidr_blocks=["0.0.0.0/0"] }
+  egress  { from_port=0; to_port=0; protocol="-1"; cidr_blocks=["0.0.0.0/0"] }
+}
+
+resource "aws_security_group" "app" {
+  name   = "${var.project}-app-sg"
+  vpc_id = module.vpc.vpc_id
+  ingress { from_port=3000; to_port=3000; protocol="tcp"; security_groups=[aws_security_group.alb.id] }
+  egress  { from_port=0; to_port=0; protocol="-1"; cidr_blocks=["0.0.0.0/0"] }
+}
+
+# Launch Template
+resource "aws_launch_template" "app" {
+  name_prefix   = "${var.project}-lt"
+  image_id      = data.aws_ami.al2023.id
+  instance_type = var.instance_type
+  vpc_security_group_ids = [aws_security_group.app.id]
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    yum update -y
+    curl -sL https://rpm.nodesource.com/setup_20.x | bash -
+    yum install -y nodejs
+    # deploy app here
+    EOF
+  )
+  tags = local.common_tags
+}
+
+# Auto Scaling Group
+resource "aws_autoscaling_group" "app" {
+  vpc_zone_identifier = module.vpc.private_subnets
+  min_size=2; max_size=6; desired_capacity=2
+  launch_template { id=aws_launch_template.app.id; version="$Latest" }
+  target_group_arns = [aws_lb_target_group.app.arn]
+  health_check_type = "ELB"
+}
+
+# ALB
+resource "aws_lb" "main" {
+  name               = "${var.project}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = module.vpc.public_subnets
+}
+
+resource "aws_lb_target_group" "app" {
+  name     = "${var.project}-tg"
+  port     = 3000
+  protocol = "HTTP"
+  vpc_id   = module.vpc.vpc_id
+  health_check { path="/health"; healthy_threshold=2; unhealthy_threshold=3 }
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>RDS PostgreSQL</strong>
+                  <pre><code">resource "aws_security_group" "rds" {
+  name   = "${var.project}-rds-sg"
+  vpc_id = module.vpc.vpc_id
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app.id]
+  }
+}
+
+resource "aws_db_instance" "postgres" {
+  identifier          = "${var.project}-db"
+  engine              = "postgres"
+  engine_version      = "15.4"
+  instance_class      = "db.t3.micro"
+  allocated_storage   = 20
+  db_name             = "appdb"
+  username            = "appuser"
+  password            = var.db_password
+  db_subnet_group_name= module.vpc.database_subnet_group_name
+  vpc_security_group_ids = [aws_security_group.rds.id]
+  multi_az            = true
+  skip_final_snapshot = false
+  final_snapshot_identifier = "${var.project}-final"
+  backup_retention_period = 7
+  tags = local.common_tags
+}</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">5</div><div class="step-content">
+                  <strong>Deploy</strong>
+                  <pre><code>terraform init
+terraform fmt          # format code
+terraform validate     # check syntax
+terraform plan -out=tfplan
+terraform apply tfplan
+
+# View outputs
+terraform output alb_dns
+curl http://$(terraform output -raw alb_dns)/health</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> ALB DNS resolves and returns 200 from app. RDS is reachable from EC2 instances on port 5432. ASG shows 2 healthy instances in target group.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-5">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">5</div><span class="sol-title">Project 5: Kubernetes Deployment with HPA</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Create namespace &amp; resource quota</strong>
+                  <pre><code">kubectl create namespace production
+
+# Apply resource quota to namespace
+cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: prod-quota
+  namespace: production
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 4Gi
+    limits.cpu: "8"
+    limits.memory: 8Gi
+    pods: "20"
+EOF</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>Create deployment.yaml</strong>
+                  <pre><code">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  namespace: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: webapp }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: webapp }
+    spec:
+      containers:
+      - name: webapp
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests: { cpu: 100m, memory: 128Mi }
+          limits:   { cpu: 500m, memory: 512Mi }
+        readinessProbe:
+          httpGet: { path: /, port: 80 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: { path: /, port: 80 }
+          initialDelaySeconds: 15
+          failureThreshold: 3</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Create service.yaml &amp; hpa.yaml</strong>
+                  <pre><code">---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-svc
+  namespace: production
+spec:
+  selector: { app: webapp }
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webapp
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Apply and monitor</strong>
+                  <pre><code">kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+kubectl apply -f hpa.yaml
+
+# Watch pods come up
+kubectl get pods -n production -w
+
+# Watch HPA
+kubectl get hpa -n production -w
+
+# Load test to trigger HPA (install k6)
+k6 run --vus 50 --duration 2m - &lt;&lt;EOF
+import http from "k6/http";
+export default function() {
+  http.get("http://webapp-svc.production.svc.cluster.local");
+}
+EOF</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Under load, <code>kubectl get hpa -n production</code> shows replica count increasing beyond 2. After load stops, it scales back down within 5 minutes.</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-6">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">6</div><span class="sol-title">Project 6: Ansible Server Configuration</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Project structure</strong>
+                  <pre><code">ansible-server-config/
+├── inventory.ini
+├── site.yml
+├── requirements.yml
+├── group_vars/
+│   └── all.yml
+└── roles/
+    ├── common/
+    ├── nginx/
+    ├── docker/
+    └── deploy-app/
+
+# Install community roles
+ansible-galaxy role install -r requirements.yml</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>inventory.ini</strong>
+                  <pre><code">[webservers]
+web01 ansible_host=192.168.1.10 ansible_user=ubuntu
+web02 ansible_host=192.168.1.11 ansible_user=ubuntu
+
+[webservers:vars]
+ansible_ssh_private_key_file=~/.ssh/id_ed25519
+ansible_become=yes</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>roles/nginx/tasks/main.yml</strong>
+                  <pre><code">---
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Configure nginx from template
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/myapp.conf
+    mode: "0644"
+  notify: reload nginx
+
+- name: Enable site
+  file:
+    src: /etc/nginx/sites-available/myapp.conf
+    dest: /etc/nginx/sites-enabled/myapp.conf
+    state: link
+  notify: reload nginx
+
+- name: Ensure nginx is running and enabled
+  service:
+    name: nginx
+    state: started
+    enabled: yes</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>site.yml (master playbook)</strong>
+                  <pre><code">---
+- name: Configure all web servers
+  hosts: webservers
+  become: yes
+
+  pre_tasks:
+    - name: Ensure apt cache is fresh
+      apt: update_cache=yes cache_valid_time=3600
+
+  roles:
+    - common
+    - docker
+    - nginx
+    - deploy-app
+
+  post_tasks:
+    - name: Verify app health
+      uri:
+        url: http://localhost:3000/health
+        status_code: 200
+      retries: 5
+      delay: 5</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">5</div><div class="step-content">
+                  <strong>Run the playbook</strong>
+                  <pre><code"># Dry run first
+ansible-playbook -i inventory.ini site.yml --check --diff
+
+# Run for real
+ansible-playbook -i inventory.ini site.yml
+
+# Run only specific role (tag it)
+ansible-playbook -i inventory.ini site.yml --tags nginx
+
+# Run on single host
+ansible-playbook -i inventory.ini site.yml --limit web01
+
+# View changed hosts
+ansible-playbook -i inventory.ini site.yml -v</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> After playbook runs, all hosts in webservers group should show nginx running, Docker installed, and the app container healthy. Re-run — all tasks should show "ok" (idempotent).</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-7">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">7</div><span class="sol-title">Project 7: Full Monitoring Stack (Prometheus + Grafana + Alertmanager)</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>docker-compose.monitoring.yml</strong>
+                  <pre><code">version: "3.9"
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports: ["9093:9093"]
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+
+volumes:
+  prometheus-data:
+  grafana-data:</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>prometheus.yml — scrape config</strong>
+                  <pre><code">global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['alertmanager:9093']
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+    - targets: ['localhost:9090']
+
+  - job_name: node
+    static_configs:
+    - targets: ['node-exporter:9100']
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: instance
+      regex: '(.+):.*'
+      replacement: '$1'</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>alert-rules.yml</strong>
+                  <pre><code">groups:
+  - name: host
+    rules:
+    - alert: HighCPU
+      expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 5m
+      labels: { severity: warning }
+      annotations:
+        summary: "High CPU on {{ $labels.instance }}"
+        description: "CPU is {{ $value | printf \"%.0f\" }}%"
+
+    - alert: DiskAlmostFull
+      expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes) * 100 < 15
+      for: 2m
+      labels: { severity: critical }
+      annotations:
+        summary: "Disk almost full on {{ $labels.instance }}"
+        description: "Only {{ $value | printf \"%.0f\" }}% free on {{ $labels.mountpoint }}"</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">4</div><div class="step-content">
+                  <strong>Deploy &amp; import Grafana dashboard</strong>
+                  <pre><code">docker compose -f docker-compose.monitoring.yml up -d
+
+# Access UIs:
+# Prometheus: http://localhost:9090
+# Grafana:    http://localhost:3000  (admin/admin)
+# Alertmanager: http://localhost:9093
+
+# In Grafana:
+# 1. Add data source: Prometheus → URL: http://prometheus:9090
+# 2. Import dashboard ID 1860 (Node Exporter Full)
+# 3. Import dashboard ID 3119 (Docker Host Dashboard)
+
+# Test alert: stop node-exporter and watch alert fire in 5 min
+docker compose -f docker-compose.monitoring.yml stop node-exporter</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Prometheus at :9090/targets shows all targets UP. Grafana at :3000 shows Node Exporter metrics. Stopping node-exporter triggers HighCPU alert (visible in Alertmanager :9093/alerts after 5 min).</div>
+            </div>
+          </div>
+          <div class="sol-item" id="sol-8">
+            <div class="sol-item-header">
+              <div class="sol-title-wrap"><div class="sol-num">8</div><span class="sol-title">Project 8: Jenkins + Kubernetes Blue-Green Deployment</span></div>
+              <span class="sol-arrow">▼</span>
+            </div>
+            <div class="sol-body">
+              <div class="sol-steps">
+                <div class="sol-step"><div class="step-num">1</div><div class="step-content">
+                  <strong>Install Jenkins on Kubernetes via Helm</strong>
+                  <pre><code">helm repo add jenkins https://charts.jenkins.io
+helm repo update
+
+helm install jenkins jenkins/jenkins \
+  --namespace jenkins --create-namespace \
+  --set controller.serviceType=LoadBalancer \
+  --set controller.installPlugins[0]=kubernetes:latest \
+  --set controller.installPlugins[1]=workflow-aggregator:latest \
+  --set controller.installPlugins[2]=git:latest
+
+# Get admin password
+kubectl exec -n jenkins svc/jenkins -- cat /run/secrets/additional/chart-admin-password
+
+# Get external URL
+kubectl get svc -n jenkins jenkins</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">2</div><div class="step-content">
+                  <strong>Blue &amp; Green Deployment manifests</strong>
+                  <pre><code">---
+# blue-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-blue
+  namespace: production
+  labels: { app: webapp, slot: blue }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: webapp, slot: blue } }
+  template:
+    metadata: { labels: { app: webapp, slot: blue } }
+    spec:
+      containers:
+      - name: webapp
+        image: myapp:BLUE_VERSION
+        ports: [{ containerPort: 3000 }]
+---
+# green-deployment.yaml  (same but slot: green)
+---
+# production-service.yaml — points to current active slot
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-prod
+  namespace: production
+spec:
+  selector: { app: webapp, slot: blue }   # change this to flip traffic
+  type: LoadBalancer
+  ports: [{ port: 80, targetPort: 3000 }]</code></pre>
+                </div></div>
+                <div class="sol-step"><div class="step-num">3</div><div class="step-content">
+                  <strong>Jenkinsfile — Blue-Green pipeline</strong>
+                  <pre><code">pipeline {
+  agent { label "jenkins-agent" }
+  environment {
+    IMAGE = "myregistry/myapp:${env.BUILD_NUMBER}"
+  }
+  stages {
+    stage("Build & Push") {
+      steps {
+        sh "docker build -t ${IMAGE} ."
+        sh "docker push ${IMAGE}"
+      }
+    }
+    stage("Determine Active Slot") {
+      steps {
+        script {
+          env.ACTIVE = sh(script: 'kubectl get svc webapp-prod -n production -o jsonpath="{.spec.selector.slot}"', returnStdout: true).trim()
+          env.TARGET = env.ACTIVE == "blue" ? "green" : "blue"
+          echo "Active: ${ACTIVE}, Deploying to: ${TARGET}"
+        }
+      }
+    }
+    stage("Deploy to Inactive Slot") {
+      steps {
+        sh "kubectl set image deployment/webapp-${env.TARGET} webapp=${IMAGE} -n production"
+        sh "kubectl rollout status deployment/webapp-${env.TARGET} -n production --timeout=3m"
+      }
+    }
+    stage("Smoke Test") {
+      steps {
+        sh 'kubectl run smoke --image=curlimages/curl --rm -i --restart=Never -n production -- curl -f http://webapp-${TARGET}-svc/health || exit 1'
+      }
+    }
+    stage("Switch Traffic") {
+      input { message "Switch production traffic to ${TARGET}?" }
+      steps {
+        sh "kubectl patch svc webapp-prod -n production -p '{"spec":{"selector":{"slot":"${env.TARGET}"}}}'"
+        echo "Traffic switched to ${env.TARGET}"
+      }
+    }
+  }
+  post {
+    failure {
+      sh "kubectl rollout undo deployment/webapp-${env.TARGET} -n production || true"
+    }
+  }
+}</code></pre>
+                </div></div>
+              </div>
+              <div class="sol-verify">✅ <strong>Verify:</strong> Run pipeline. After smoke test passes and you approve, traffic switches to green slot. Old blue slot remains as instant rollback. Verify by checking <code>kubectl get svc webapp-prod -n production -o yaml | grep slot</code>.</div>
+            </div>
           </div>
         </div>
       </div>
